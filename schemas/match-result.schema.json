@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "EligibilityStatus": {
+      "enum": [
+        "ELIGIBLE",
+        "CONDITIONALLY_ELIGIBLE",
+        "INSUFFICIENT_INFORMATION",
+        "INELIGIBLE_WORK_AUTHORIZATION",
+        "INELIGIBLE_EXPERIENCE",
+        "INELIGIBLE_SENIORITY",
+        "INELIGIBLE_CITIZENSHIP"
+      ],
+      "title": "EligibilityStatus",
+      "type": "string"
+    },
+    "EvidenceMatch": {
+      "properties": {
+        "requirement_id": {
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "requirement": {
+          "title": "Requirement",
+          "type": "string"
+        },
+        "candidate_skill": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Candidate Skill"
+        },
+        "evidence_score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Evidence Score",
+          "type": "number"
+        },
+        "relation": {
+          "title": "Relation",
+          "type": "string"
+        },
+        "candidate_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Candidate Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "requirement",
+        "candidate_skill",
+        "evidence_score",
+        "relation"
+      ],
+      "title": "EvidenceMatch",
+      "type": "object"
+    },
+    "MatchScores": {
+      "properties": {
+        "technical_skills": {
+          "title": "Technical Skills",
+          "type": "number"
+        },
+        "responsibility_alignment": {
+          "title": "Responsibility Alignment",
+          "type": "number"
+        },
+        "education": {
+          "title": "Education",
+          "type": "number"
+        },
+        "career_level": {
+          "title": "Career Level",
+          "type": "number"
+        },
+        "domain": {
+          "title": "Domain",
+          "type": "number"
+        },
+        "tools_deployment": {
+          "title": "Tools Deployment",
+          "type": "number"
+        },
+        "soft_skills": {
+          "title": "Soft Skills",
+          "type": "number"
+        },
+        "pre_penalty_total": {
+          "title": "Pre Penalty Total",
+          "type": "number"
+        },
+        "penalty": {
+          "title": "Penalty",
+          "type": "number"
+        },
+        "final_match_score": {
+          "title": "Final Match Score",
+          "type": "number"
+        },
+        "assessment_confidence": {
+          "title": "Assessment Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "technical_skills",
+        "responsibility_alignment",
+        "education",
+        "career_level",
+        "domain",
+        "tools_deployment",
+        "soft_skills",
+        "pre_penalty_total",
+        "penalty",
+        "final_match_score",
+        "assessment_confidence"
+      ],
+      "title": "MatchScores",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "match-result.v1",
+      "default": "match-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "eligibility_status": {
+      "$ref": "#/$defs/EligibilityStatus"
+    },
+    "eligibility_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Eligibility Reasons",
+      "type": "array"
+    },
+    "work_authorization_risk": {
+      "title": "Work Authorization Risk",
+      "type": "string"
+    },
+    "scores": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MatchScores"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence_matches": {
+      "items": {
+        "$ref": "#/$defs/EvidenceMatch"
+      },
+      "title": "Evidence Matches",
+      "type": "array"
+    },
+    "critical_gaps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Critical Gaps",
+      "type": "array"
+    },
+    "policy_versions": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Policy Versions",
+      "type": "object"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "job_id",
+    "eligibility_status",
+    "eligibility_reasons",
+    "work_authorization_risk",
+    "scores",
+    "policy_versions"
+  ],
+  "title": "MatchResult",
+  "type": "object"
+}

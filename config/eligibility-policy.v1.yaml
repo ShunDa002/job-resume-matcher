@@ -1,0 +1,19 @@
+version: eligibility-policy.v1
+fresh_graduate:
+  reject_required_experience_years_at_or_above: 3
+  conditional_required_experience_years_at_or_above: 1
+excluded_seniority_levels:
+  - senior
+  - lead
+  - manager
+  - senior_manager
+  - director
+  - head
+  - executive
+citizenship:
+  explicit_mismatch_is_ineligible: true
+work_authorization:
+  explicit_no_sponsorship_without_rights_is_ineligible: true
+  unknown_sponsorship_without_rights_is_conditional: true
+employment_type:
+  mismatch_is_conditional: true

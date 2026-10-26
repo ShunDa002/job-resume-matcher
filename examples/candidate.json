@@ -1,0 +1,15 @@
+{
+  "schema_version":"candidate-profile.v1","candidate_id":"candidate-001","citizenship_country_code":"MY","residence_country_code":"MY","has_target_country_work_rights":false,"target_employment_types":["full_time"],"career_level":"fresh_graduate","professional_experience_years":0,"degree_fields":["software_engineering"],"graduation_date":"2026-09-30",
+  "skills":[
+    {"skill_id":"python","category":"technical_skills","level":"deployed_project","evidence":["Deepfake detection and RAG projects"]},
+    {"skill_id":"typescript","category":"technical_skills","level":"substantial_project","evidence":["Web application development"]},
+    {"skill_id":"pytorch","category":"technical_skills","level":"deployed_project","evidence":["Deepfake model fine-tuning"]},
+    {"skill_id":"langchain","category":"technical_skills","level":"deployed_project","evidence":["SPM History RAG pipeline"]},
+    {"skill_id":"supabase_vector","category":"technical_skills","level":"deployed_project","evidence":["Supabase vector database"]},
+    {"skill_id":"fastapi","category":"tools_deployment","level":"substantial_project","evidence":["Backend application framework"]},
+    {"skill_id":"docker","category":"tools_deployment","level":"deployed_project","evidence":["Containerized deepfake application"]},
+    {"skill_id":"nextjs","category":"technical_skills","level":"substantial_project","evidence":["Web development framework"]},
+    {"skill_id":"computer_vision","category":"domain","level":"deployed_project","evidence":["Deepfake image detection"]},
+    {"skill_id":"rag","category":"domain","level":"deployed_project","evidence":["Asynchronous RAG pipeline"]}
+  ],"responsibilities":[],"domains":[],"soft_skills":[]
+}

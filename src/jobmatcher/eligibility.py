@@ -1,0 +1,22 @@
+from .models import CandidateProfile,JobRecord,EligibilityStatus
+
+def determine_eligibility(candidate:CandidateProfile,job:JobRecord,policy:dict):
+    reasons=[]; risk="none"
+    if job.required_citizenship_country_code and job.required_citizenship_country_code != candidate.citizenship_country_code:
+        return EligibilityStatus.INELIGIBLE_CITIZENSHIP,[f"Requires citizenship {job.required_citizenship_country_code}; candidate citizenship is {candidate.citizenship_country_code}."],"not_applicable"
+    threshold=policy["fresh_graduate"]["reject_required_experience_years_at_or_above"]
+    cond=policy["fresh_graduate"]["conditional_required_experience_years_at_or_above"]
+    if job.experience_requirement_type=="required" and job.minimum_experience_years is not None:
+        if candidate.career_level=="fresh_graduate" and job.minimum_experience_years>=threshold:
+            return EligibilityStatus.INELIGIBLE_EXPERIENCE,[f"Requires {job.minimum_experience_years:g}+ years; candidate has {candidate.professional_experience_years:g} years."],"not_applicable"
+    if job.career_level in set(policy["excluded_seniority_levels"]) and candidate.career_level=="fresh_graduate":
+        return EligibilityStatus.INELIGIBLE_SENIORITY,[f"Career level '{job.career_level}' is excluded for a fresh graduate."],"not_applicable"
+    if job.location_country_code != candidate.citizenship_country_code and not candidate.has_target_country_work_rights:
+        if job.sponsorship=="not_available":
+            return EligibilityStatus.INELIGIBLE_WORK_AUTHORIZATION,["Candidate lacks target-country work rights and sponsorship is unavailable."],"high"
+        if job.sponsorship=="unknown": reasons.append("Work authorization sponsorship is not stated."); risk="unknown"
+    if job.experience_requirement_type=="required" and job.minimum_experience_years is not None and job.minimum_experience_years>=cond and candidate.professional_experience_years<job.minimum_experience_years:
+        reasons.append(f"Candidate has less than the required {job.minimum_experience_years:g} years.")
+    if candidate.target_employment_types and job.employment_type not in candidate.target_employment_types:
+        reasons.append(f"Employment type '{job.employment_type}' is outside candidate targets.")
+    return (EligibilityStatus.CONDITIONALLY_ELIGIBLE if reasons else EligibilityStatus.ELIGIBLE),reasons,risk

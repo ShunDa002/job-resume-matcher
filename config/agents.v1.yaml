@@ -1,0 +1,37 @@
+version: agents.v1
+
+adapters:
+  antigravity:
+    executable: agy
+    minimum_version: 1.1.10
+    timeout_seconds: 310
+    native_schema: true
+    output_format: json
+    print_timeout: 5m
+    disable_slash_commands: true
+    dangerously_skip_permissions: true
+    effort: low
+    maximum_retries: 1
+
+  claude:
+    executable: claude
+    minimum_version: 1.0.0
+    timeout_seconds: 310
+    native_schema: true
+    bare: true
+
+  codex:
+    executable: codex
+    minimum_version: 0.1.0
+    timeout_seconds: 310
+    native_schema: true
+    sandbox: read-only
+
+  copilot:
+    executable: copilot
+    minimum_version: 0.1.0
+    timeout_seconds: 310
+    native_schema: false
+    silent: true
+    no_ask_user: true
+    model: null

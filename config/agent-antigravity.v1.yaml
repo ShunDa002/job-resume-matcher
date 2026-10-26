@@ -1,0 +1,9 @@
+version: agent-antigravity.v1
+executable: agy
+minimum_version: 1.1.10
+output_format: json
+print_timeout: 5m
+disable_slash_commands: true
+dangerously_skip_permissions: true
+effort: medium
+maximum_retries: 1

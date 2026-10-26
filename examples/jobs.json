@@ -1,0 +1,17 @@
+[
+  {
+    "schema_version":"normalized-job.v1","source":"jobstreet_sg","source_job_id":"95408528","source_url":"https://sg.jobstreet.com/job/95408528?tracking=x","title":"AI LLM Developer","company":"Ensign","location_country_code":"SG","location_text":"Singapore","employment_type":"full_time","description":"Build front-end and back-end services integrating LLMs, agents and data sources.","minimum_experience_years":null,"experience_requirement_type":"not_stated","career_level":"entry_level","sponsorship":"unknown","degree_fields":["computer_science","software_engineering"],
+    "requirements":[
+      {"requirement_id":"j1-r1","canonical_value":"python","category":"technical_skills","necessity":"required","importance":"core","critical":true,"original_text":"Good grasp of Python"},
+      {"requirement_id":"j1-r2","canonical_value":"typescript","category":"technical_skills","necessity":"required","importance":"supporting","critical":false,"alternatives":["react"],"original_text":"React or TypeScript"},
+      {"requirement_id":"j1-r3","canonical_value":"docker","category":"tools_deployment","necessity":"required","importance":"supporting","critical":false,"alternatives":["kubernetes"],"original_text":"Docker or Kubernetes"},
+      {"requirement_id":"j1-r4","canonical_value":"rag","category":"domain","necessity":"required","importance":"core","critical":true,"original_text":"RAG exposure"}
+    ]
+  },
+  {
+    "schema_version":"normalized-job.v1","source":"jobstreet_sg","source_job_id":"95393535","source_url":"https://sg.jobstreet.com/job/95393535","title":"Engineer AI and Digitalisation","company":"ST Engineering Defence Aviation Services","location_country_code":"SG","location_text":"Singapore","employment_type":"full_time","description":"Applicants must be Singaporean citizens.","career_level":"entry_level","required_citizenship_country_code":"SG","sponsorship":"not_available","degree_fields":["computer_science","software_engineering"],"requirements":[]
+  },
+  {
+    "schema_version":"normalized-job.v1","source":"jobstreet_sg","source_job_id":"95411639","source_url":"https://sg.jobstreet.com/job/95411639","title":"Senior AI Engineer","company":"Digital Place Vision","location_country_code":"SG","location_text":"Singapore","employment_type":"full_time","description":"Requires 4+ years in AI ML engineering.","minimum_experience_years":4,"experience_requirement_type":"required","career_level":"senior","sponsorship":"unknown","degree_fields":["computer_science"],"requirements":[]
+  }
+]

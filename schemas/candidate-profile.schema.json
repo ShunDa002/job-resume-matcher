@@ -1,0 +1,179 @@
+{
+  "$defs": {
+    "SkillEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "technical_skills",
+            "responsibility_alignment",
+            "education",
+            "domain",
+            "tools_deployment",
+            "soft_skills"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "deployed_professional",
+            "deployed_project",
+            "substantial_project",
+            "coursework",
+            "stated_only"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "skill_id",
+        "category",
+        "level",
+        "evidence"
+      ],
+      "title": "SkillEvidence",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "candidate-profile.v1",
+      "default": "candidate-profile.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "citizenship_country_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Citizenship Country Code"
+    },
+    "residence_country_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Residence Country Code"
+    },
+    "has_target_country_work_rights": {
+      "default": false,
+      "title": "Has Target Country Work Rights",
+      "type": "boolean"
+    },
+    "target_employment_types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Employment Types",
+      "type": "array"
+    },
+    "career_level": {
+      "default": "unknown",
+      "enum": [
+        "student",
+        "fresh_graduate",
+        "junior",
+        "mid",
+        "senior",
+        "manager",
+        "unknown"
+      ],
+      "title": "Career Level",
+      "type": "string"
+    },
+    "professional_experience_years": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Professional Experience Years",
+      "type": "number"
+    },
+    "degree_fields": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Degree Fields",
+      "type": "array"
+    },
+    "graduation_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Graduation Date"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/SkillEvidence"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "responsibilities": {
+      "items": {
+        "$ref": "#/$defs/SkillEvidence"
+      },
+      "title": "Responsibilities",
+      "type": "array"
+    },
+    "domains": {
+      "items": {
+        "$ref": "#/$defs/SkillEvidence"
+      },
+      "title": "Domains",
+      "type": "array"
+    },
+    "soft_skills": {
+      "items": {
+        "$ref": "#/$defs/SkillEvidence"
+      },
+      "title": "Soft Skills",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "candidate_id"
+  ],
+  "title": "CandidateExtractionResult",
+  "type": "object"
+}

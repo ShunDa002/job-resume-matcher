@@ -1,0 +1,288 @@
+{
+  "$defs": {
+    "Citizenship": {
+      "additionalProperties": false,
+      "properties": {
+        "requirement": {
+          "enum": [
+            "explicit",
+            "not_stated"
+          ],
+          "title": "Requirement",
+          "type": "string"
+        },
+        "country_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country Code"
+        },
+        "evidence_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Text"
+        }
+      },
+      "required": [
+        "requirement"
+      ],
+      "title": "Citizenship",
+      "type": "object"
+    },
+    "Importance": {
+      "enum": [
+        "core",
+        "supporting"
+      ],
+      "title": "Importance",
+      "type": "string"
+    },
+    "Necessity": {
+      "enum": [
+        "required",
+        "preferred"
+      ],
+      "title": "Necessity",
+      "type": "string"
+    },
+    "WorkAuth": {
+      "additionalProperties": false,
+      "properties": {
+        "sponsorship": {
+          "enum": [
+            "available",
+            "not_available",
+            "unknown"
+          ],
+          "title": "Sponsorship",
+          "type": "string"
+        },
+        "evidence_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Text"
+        }
+      },
+      "required": [
+        "sponsorship"
+      ],
+      "title": "WorkAuth",
+      "type": "object"
+    },
+    "XJob": {
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "normalized_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalized Title"
+        },
+        "normalized_company": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalized Company"
+        },
+        "minimum_experience_years": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Experience Years"
+        },
+        "experience_requirement_type": {
+          "enum": [
+            "required",
+            "preferred",
+            "not_stated"
+          ],
+          "title": "Experience Requirement Type",
+          "type": "string"
+        },
+        "career_level": {
+          "enum": [
+            "entry_level",
+            "unspecified",
+            "senior",
+            "lead",
+            "manager",
+            "senior_manager",
+            "director",
+            "head",
+            "executive"
+          ],
+          "title": "Career Level",
+          "type": "string"
+        },
+        "citizenship": {
+          "$ref": "#/$defs/Citizenship"
+        },
+        "work_authorization": {
+          "$ref": "#/$defs/WorkAuth"
+        },
+        "degree_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Degree Fields",
+          "type": "array"
+        },
+        "requirements": {
+          "items": {
+            "$ref": "#/$defs/XReq"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "job_id",
+        "experience_requirement_type",
+        "career_level",
+        "citizenship",
+        "work_authorization"
+      ],
+      "title": "XJob",
+      "type": "object"
+    },
+    "XReq": {
+      "additionalProperties": false,
+      "properties": {
+        "requirement_id": {
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "canonical_value": {
+          "title": "Canonical Value",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "technical_skills",
+            "responsibility_alignment",
+            "education",
+            "domain",
+            "tools_deployment",
+            "soft_skills"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "necessity": {
+          "$ref": "#/$defs/Necessity"
+        },
+        "importance": {
+          "$ref": "#/$defs/Importance"
+        },
+        "critical": {
+          "default": false,
+          "title": "Critical",
+          "type": "boolean"
+        },
+        "minimum_years": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Years"
+        },
+        "original_text": {
+          "title": "Original Text",
+          "type": "string"
+        },
+        "alternatives": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "canonical_value",
+        "category",
+        "necessity",
+        "importance",
+        "original_text"
+      ],
+      "title": "XReq",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "extraction-result.v1",
+      "default": "extraction-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/XJob"
+      },
+      "title": "Jobs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "jobs"
+  ],
+  "title": "ExtractionResult",
+  "type": "object"
+}

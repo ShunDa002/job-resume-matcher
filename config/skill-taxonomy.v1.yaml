@@ -1,0 +1,46 @@
+version: skill-taxonomy.v1
+skills:
+  python:
+    aliases: [python3]
+  typescript:
+    aliases: [ts]
+  react:
+    aliases: [reactjs, react.js]
+    related:
+      nextjs: 0.80
+  nextjs:
+    aliases: [next.js]
+  fastapi:
+    aliases: []
+  docker:
+    aliases: [containers, containerization]
+    related:
+      kubernetes: 0.35
+  kubernetes:
+    aliases: [k8s]
+  pytorch:
+    aliases: [torch]
+  tensorflow:
+    aliases: [tf]
+  rag:
+    aliases: [retrieval augmented generation, retrieval-augmented generation]
+  langchain:
+    aliases: []
+    related:
+      rag: 0.80
+  vector_database:
+    aliases: [vector db, vector store]
+  supabase_vector:
+    aliases: [supabase vector db]
+    related:
+      vector_database: 0.90
+  computer_vision:
+    aliases: [cv, image classification]
+  llm:
+    aliases: [large language model, large language models]
+  mcp:
+    aliases: [model context protocol]
+  git:
+    aliases: []
+  linux:
+    aliases: []

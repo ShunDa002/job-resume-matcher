@@ -1,0 +1,323 @@
+{
+  "$defs": {
+    "Importance": {
+      "enum": [
+        "core",
+        "supporting"
+      ],
+      "title": "Importance",
+      "type": "string"
+    },
+    "Necessity": {
+      "enum": [
+        "required",
+        "preferred"
+      ],
+      "title": "Necessity",
+      "type": "string"
+    },
+    "Requirement": {
+      "properties": {
+        "requirement_id": {
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "canonical_value": {
+          "title": "Canonical Value",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "technical_skills",
+            "responsibility_alignment",
+            "education",
+            "domain",
+            "tools_deployment",
+            "soft_skills"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "necessity": {
+          "$ref": "#/$defs/Necessity"
+        },
+        "importance": {
+          "$ref": "#/$defs/Importance",
+          "default": "supporting"
+        },
+        "critical": {
+          "default": false,
+          "title": "Critical",
+          "type": "boolean"
+        },
+        "minimum_years": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Years"
+        },
+        "original_text": {
+          "title": "Original Text",
+          "type": "string"
+        },
+        "alternatives": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "canonical_value",
+        "category",
+        "necessity",
+        "original_text"
+      ],
+      "title": "Requirement",
+      "type": "object"
+    },
+    "Salary": {
+      "properties": {
+        "disclosed": {
+          "default": false,
+          "title": "Disclosed",
+          "type": "boolean"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period"
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum"
+        },
+        "maximum": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum"
+        }
+      },
+      "title": "Salary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "normalized-job.v1",
+      "default": "normalized-job.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Job Id"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "source_job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Job Id"
+    },
+    "source_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Url"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "company": {
+      "title": "Company",
+      "type": "string"
+    },
+    "location_country_code": {
+      "title": "Location Country Code",
+      "type": "string"
+    },
+    "location_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location Text"
+    },
+    "employment_type": {
+      "default": "full_time",
+      "title": "Employment Type",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "salary": {
+      "$ref": "#/$defs/Salary"
+    },
+    "minimum_experience_years": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Minimum Experience Years"
+    },
+    "experience_requirement_type": {
+      "default": "not_stated",
+      "enum": [
+        "required",
+        "preferred",
+        "not_stated"
+      ],
+      "title": "Experience Requirement Type",
+      "type": "string"
+    },
+    "career_level": {
+      "default": "unspecified",
+      "title": "Career Level",
+      "type": "string"
+    },
+    "required_citizenship_country_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Required Citizenship Country Code"
+    },
+    "sponsorship": {
+      "default": "unknown",
+      "enum": [
+        "available",
+        "not_available",
+        "unknown"
+      ],
+      "title": "Sponsorship",
+      "type": "string"
+    },
+    "degree_fields": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Degree Fields",
+      "type": "array"
+    },
+    "requirements": {
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "title": "Requirements",
+      "type": "array"
+    },
+    "data_quality_flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Data Quality Flags",
+      "type": "array"
+    },
+    "content_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Content Hash"
+    }
+  },
+  "required": [
+    "source",
+    "title",
+    "company",
+    "location_country_code",
+    "description"
+  ],
+  "title": "JobRecord",
+  "type": "object"
+}
