@@ -69,9 +69,9 @@ python scripts/generate_schema.py
 
 ---
 
-## Quick Demo (Phase 1 Deterministic Foundation)
+## Quick Demo
 
-Run the full end-to-end deterministic demo script:
+Run the end-to-end demo script:
 
 ```bash
 bash scripts/demo.sh
@@ -94,15 +94,16 @@ jobmatch match --candidate-id candidate-001 --db data/work/jobmatcher.db
 jobmatch report --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/results.json
 jobmatch report --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/results.csv
 
-# Run test suite
-pytest -q
+# Generate summary reports (JSON and CSV)
+jobmatch summarize --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/match-summary.json
+jobmatch summarize --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/match-summary.csv
 ```
 
 ---
 
-## Phase 1: Deterministic Matching Foundation
+## Deterministic Matching Engine
 
-Phase 1 deliberately contains **no LLM calls**. It provides the reproducible mathematical and rule-based core:
+The core matching engine deliberately contains **no LLM calls**. It provides a reproducible mathematical and rule-based evaluation pipeline:
 
 - **Input Contracts**: Jobs and candidates are validated against Pydantic models ([src/jobmatcher/models.py](file:///c/Data/ide-sbx-isolation/job-matcher/src/jobmatcher/models.py)) and JSON Schemas ([schemas/](file:///c/Data/ide-sbx-isolation/job-matcher/schemas/)).
 - **Hard Eligibility Gates**: Evaluates candidate eligibility prior to scoring ([src/jobmatcher/eligibility.py](file:///c/Data/ide-sbx-isolation/job-matcher/src/jobmatcher/eligibility.py)):
@@ -118,52 +119,34 @@ Phase 1 deliberately contains **no LLM calls**. It provides the reproducible mat
 
 ---
 
-## Phase 2: AI Job Extraction (Antigravity Adapter)
+## AI Extraction & Universal Adapter Layer
 
-Phase 2 introduces automated extraction of structured job requirements from raw ad descriptions using the Antigravity CLI (`agy`):
+Automated extraction parses unstructured job postings into structured requirements using CLI-based AI assistants:
 
-- **Execution Boundary**: Uses headless print mode, JSON output, native JSON Schema enforcement, bounded workspace via `--add-dir`, and disabled slash expansion.
-- **Auditing & Repair**: Each extraction batch writes an immutable audit log to `data/output/extraction-audit/`. Invalid outputs trigger a single schema-guided repair attempt.
-- **Deterministic Cache**: Extractions are cached in SQLite using a composite hash of job content, prompt, schema, and adapter configuration.
+- **Supported Adapters**: `antigravity` (default), `claude`, `codex`, and `copilot`. Custom binary paths can be specified with `--executable`.
+- **Execution & Security Boundary**: Adapters run headless with JSON output, bounded workspaces (`--add-dir`), and disabled slash commands or interactive prompts.
+- **Schema Enforcement**: Claude, Codex, and Antigravity enforce schemas natively. Copilot receives schemas within bounded prompts with `-s`, disallows interactive questions, and is validated by identical local Pydantic rules.
+- **Deterministic Caching**: Extractions are cached in SQLite keyed by a composite hash of the job content, prompt, schema, and adapter configuration. Use `--force` to bypass the cache.
+- **Auditing & Repair**: Each batch writes immutable execution artifacts to `data/output/extraction-audit/`. Malformed outputs trigger a single schema-guided repair attempt.
 
-```bash
-# Probe agent availability and flags
-jobmatch probe-agent --executable agy
-
-# Extract requirements from raw job descriptions into SQLite
-jobmatch extract-jobs --db data/work/jobmatcher.db --batch-size 5 --executable agy
-
-# Re-run matching against newly extracted jobs
-jobmatch match --candidate-id candidate-001 --db data/work/jobmatcher.db
-```
-
-Use `--force` to bypass the extraction cache when updating prompts or schemas.
-
----
-
-## Phase 3: Universal AI Adapter Layer
-
-Phase 3 generalizes agent execution across multiple CLI-based AI assistants:
-- **Supported Adapters**: `antigravity`, `claude`, `codex`, and `copilot`.
-- **Schema Enforcement**: Claude and Codex enforce native schemas. Copilot receives schemas within bounded prompts with `-s`, disallows interactive questions, and is validated by identical local Pydantic rules.
-- **Auditable Cache Keys**: Cache keys incorporate adapter configuration, keeping provider runs isolated and auditable.
+### Adapter CLI Commands
 
 ```bash
-# Probe individual or all configured adapters
+# Probe agent availability and flags across adapters
+jobmatch probe-agent --adapter antigravity
 jobmatch probe-agent --adapter claude
 jobmatch probe-agent --adapter codex
 jobmatch probe-agent --adapter copilot
 jobmatch probe-all-agents
 
-# Extract jobs using a selected adapter
+# Extract structured requirements from raw jobs into SQLite
+jobmatch extract-jobs --adapter antigravity --db data/work/jobmatcher.db --batch-size 5
 jobmatch extract-jobs --adapter claude --db data/work/jobmatcher.db
-jobmatch extract-jobs --adapter codex --db data/work/jobmatcher.db
-jobmatch extract-jobs --adapter copilot --db data/work/jobmatcher.db
 ```
 
 ---
 
-## Resume Parsing & Ingestion Extension
+## Resume Parsing & Ingestion
 
 Extracts validated candidate profiles from resumes in multiple document formats.
 
@@ -300,20 +283,73 @@ jobmatch ingest-resume \
 
 ---
 
+## Readable Match Summary
+
+The detailed `jobmatch report` output is intended for audits and programmatic processing. Use `jobmatch summarize` when you need a compact result containing only:
+
+- `rank`
+- `job_id`
+- `eligibility`
+- `final_match_score`
+- `requirements`
+- `jobstreet_url`
+
+### JSON summary
+
+```bash
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.json
+```
+
+### CSV summary
+
+```bash
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.csv
+```
+
+The output format is selected from the file extension. A `.csv` path creates CSV; other extensions create formatted JSON.
+
+Example JSON:
+
+```json
+[
+  {
+    "rank": 1,
+    "job_id": "jobstreet_sg-95408528",
+    "eligibility": "CONDITIONALLY_ELIGIBLE",
+    "final_match_score": 93.69,
+    "requirements": [
+      "Good grasp of Python [required, core, critical]",
+      "React or TypeScript (alternatives: react) [required, supporting]",
+      "Docker or Kubernetes (alternatives: kubernetes) [required, supporting]"
+    ],
+    "jobstreet_url": "https://sg.jobstreet.com/job/95408528"
+  }
+]
+```
+
+Hard-ineligible jobs have `null` for `final_match_score`. If a stored job has no requirements or URL, the command writes an empty requirements list or `null` URL rather than inventing data.
+
 ## CLI Command Summary
 
-| Command | Description |
-|---|---|
-| `jobmatch init-db` | Initialize SQLite tables and indexes |
-| `jobmatch ingest-jobs` | Ingest normalized canonical job JSON into SQLite |
-| `jobmatch ingest-candidate` | Ingest canonical candidate profile JSON into SQLite |
-| `jobmatch parse-resume` | Parse PDF/DOCX/DOC/TXT/MD resume locally to JSON without AI |
-| `jobmatch ingest-resume` | Parse resume, extract candidate via AI adapter, validate, and store in DB |
-| `jobmatch probe-agent` | Probe availability and flags for a specific AI CLI agent |
-| `jobmatch probe-all-agents` | Check availability across all configured adapters |
-| `jobmatch extract-jobs` | Extract structured requirements from raw jobs via AI adapter |
-| `jobmatch match` | Run deterministic matching and print ranked results |
-| `jobmatch report` | Export detailed match results to JSON or CSV |
+| Command                     | Description                                                               |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `jobmatch init-db`          | Initialize SQLite tables and indexes                                      |
+| `jobmatch ingest-jobs`      | Ingest normalized canonical job JSON into SQLite                          |
+| `jobmatch ingest-candidate` | Ingest canonical candidate profile JSON into SQLite                       |
+| `jobmatch parse-resume`     | Parse PDF/DOCX/DOC/TXT/MD resume locally to JSON without AI               |
+| `jobmatch ingest-resume`    | Parse resume, extract candidate via AI adapter, validate, and store in DB |
+| `jobmatch probe-agent`      | Probe availability and flags for a specific AI CLI agent                  |
+| `jobmatch probe-all-agents` | Check availability across all configured adapters                         |
+| `jobmatch extract-jobs`     | Extract structured requirements from raw jobs via AI adapter              |
+| `jobmatch match`            | Run deterministic matching and print ranked results                       |
+| `jobmatch report`           | Export detailed match results to JSON or CSV                              |
+| `jobmatch summarize`        | Export consolidated match summary to JSON or CSV                          |
 
 ---
 

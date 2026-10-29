@@ -1,4 +1,5 @@
 # Universal Job-to-Resume Matcher
+
 ## Complete User Manual and CLI Workflow Guide
 
 **Implementation scope:** Deterministic matching foundation, universal AI adapter layer, and resume document ingestion  
@@ -49,6 +50,7 @@ The selected AI agent does not calculate the final score and does not decide whe
 - Stable ranking and tie-breaking
 - JSON reports
 - CSV reports
+- Consolidated summary reports (JSON and CSV)
 
 ## 2.2 Universal AI adapter layer
 
@@ -153,6 +155,7 @@ probe-all-agents
 extract-jobs
 match
 report
+summarize
 ```
 
 Use:
@@ -209,6 +212,12 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
+Generate candidate JSON schema:
+
+```bash
+python scripts/generate_schema.py
+```
+
 The resume extension requires these Python packages:
 
 ```text
@@ -224,6 +233,12 @@ PyYAML
 jobmatch --help
 pytest -q
 python -m compileall -q src
+```
+
+You can also run the full end-to-end deterministic foundation demo:
+
+```bash
+bash scripts/demo.sh
 ```
 
 ---
@@ -379,7 +394,7 @@ Resume ingestion generates this structure automatically.
 
 ## 8.3 Operator overrides
 
-Create a file such as `data/input/candidate-overrides.json`:
+Create a file such as `data/input/candidate-overrides.json` or use `examples/operator-overrides.json`:
 
 ```json
 {
@@ -405,6 +420,7 @@ Overrides should be used for facts that must not be guessed from a resume.
 6. Extract job requirements through the selected agent
 7. Calculate matches
 8. Generate JSON and CSV reports
+9. Generate readable summary in JSON or CSV
 ```
 
 Commands:
@@ -417,13 +433,13 @@ jobmatch ingest-jobs \
   --db data/work/jobmatcher.db
 
 jobmatch parse-resume \
-  --resume data/input/resume.pdf \
+  --resume data/input/resume.docx \
   --output data/output/parsed-resume.json
 
 jobmatch probe-agent --adapter antigravity
 
 jobmatch ingest-resume \
-  --resume data/input/resume.pdf \
+  --resume data/input/resume.docx \
   --candidate-id candidate-001 \
   --adapter antigravity \
   --overrides data/input/candidate-overrides.json \
@@ -447,6 +463,16 @@ jobmatch report \
   --candidate-id candidate-001 \
   --db data/work/jobmatcher.db \
   --output data/output/results.csv
+
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.json
+
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.csv
 ```
 
 ---
@@ -550,7 +576,7 @@ jobmatch ingest-candidate \
 
 ```bash
 jobmatch ingest-candidate \
-  --input data/input/candidate.json \
+  --input examples/candidate.json \
   --db data/work/jobmatcher.db
 ```
 
@@ -929,10 +955,7 @@ jobmatch extract-jobs \
   "total": 10000,
   "cached": 9850,
   "completed": 147,
-  "failed": [
-    "jobstreet_sg-123456",
-    "jobstreet_sg-789012"
-  ]
+  "failed": ["jobstreet_sg-123456", "jobstreet_sg-789012"]
 }
 ```
 
@@ -1072,6 +1095,82 @@ The CSV report is optimized for ranking review in spreadsheet software.
 
 ---
 
+## 10.11 `jobmatch summarize`
+
+### Purpose
+
+Runs deterministic matching and produces a consolidated summary report in JSON or CSV format. It joins ranked match results with stored canonical job records to present clean, high-level decision-support data: rank, job ID, eligibility status, final match score, formatted requirement labels (including necessity, importance, criticality, and alternatives), and the source job posting URL.
+
+### Syntax
+
+```bash
+jobmatch summarize \
+  --candidate-id ID \
+  [--db PATH] \
+  --output PATH
+```
+
+### Options
+
+| Option | Required | Default | Description |
+|---|---|---|---|
+| `--candidate-id` | Yes | - | Candidate identifier to match against stored jobs |
+| `--db` | No | `data/work/jobmatcher.db` | Path to the SQLite database |
+| `--output` | Yes | - | Output file path (`.json` or `.csv`) |
+
+### Summary Fields
+
+Each record in the summary output contains:
+
+| Field | Type | Description |
+|---|---|---|
+| `rank` | integer | Candidate's rank position (1-indexed, deterministic tie-breaking) |
+| `job_id` | string | Normalized job identifier (e.g. `jobstreet_sg-95455412`) |
+| `eligibility` | string | Gate status (`ELIGIBLE`, `INELIGIBLE_CITIZENSHIP`, `INELIGIBLE_EXPERIENCE`, `INELIGIBLE_SENIORITY`, `INELIGIBLE_WORK_AUTHORIZATION`) |
+| `final_match_score` | float \| null | Weighted requirement match score (null if ineligible) |
+| `requirements` | list[string] | Formatted requirements with annotations, e.g. `Python [required, core, critical]` |
+| `jobstreet_url` | string \| null | Direct canonical URL to the job advertisement |
+
+### JSON summary
+
+```bash
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.json
+```
+
+Example JSON output structure:
+
+```json
+[
+  {
+    "rank": 1,
+    "job_id": "jobstreet_sg-95455412",
+    "eligibility": "ELIGIBLE",
+    "final_match_score": 88.5,
+    "requirements": [
+      "Python [required, core, critical]",
+      "Docker (alternatives: podman) [required, secondary]"
+    ],
+    "jobstreet_url": "https://sg.jobstreet.com/job/95455412"
+  }
+]
+```
+
+### CSV summary
+
+```bash
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.csv
+```
+
+In CSV format, the `requirements` list is serialized as a JSON string within the cell to preserve structure when viewed in spreadsheet software.
+
+---
+
 # 11. Resume Format Details
 
 ## 11.1 PDF
@@ -1083,7 +1182,8 @@ Image-only or scanned PDFs are rejected when too little embedded text is detecte
 ### OCR workflow
 
 ```bash
-python /home/oai/skills/pdfs/scripts/ocr_pdf.py \
+# Example using an OCR utility
+python scripts/ocr_pdf.py \
   data/input/resume-scanned.pdf \
   --output data/input/resume-searchable.pdf
 ```
@@ -1174,13 +1274,12 @@ Provider invocation records. Attempt 2 is created only after a failed first resu
 
 ```text
 data/output/extraction-audit/
-├── antigravity/
-├── claude/
-├── codex/
-└── copilot/
+├── batch-000000/
+├── batch-000001/
+└── batch-000002/
 ```
 
-Each batch may contain:
+Each batch directory contains:
 
 ```text
 input.json
@@ -1188,11 +1287,10 @@ validation.json
 attempt-1/
   prompt.txt
   invocation.json
-  stdout.raw
+  stdout.json
   stderr.log
   envelope.json
   structured.json
-  last-message.json
 attempt-2/
 ```
 
@@ -1578,6 +1676,17 @@ jobmatch report \
   --candidate-id candidate-001 \
   --db data/work/jobmatcher.db \
   --output data/output/job-matches.csv
+
+# Generate concise summary in JSON and CSV
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.json
+
+jobmatch summarize \
+  --candidate-id candidate-001 \
+  --db data/work/jobmatcher.db \
+  --output data/output/match-summary.csv
 ```
 
 ---
@@ -1643,7 +1752,7 @@ jobmatch init-db --db data/work/jobmatcher.db
 jobmatch ingest-jobs --input data/input/jobs.json --db data/work/jobmatcher.db
 
 # Load prebuilt candidate JSON
-jobmatch ingest-candidate --input data/input/candidate.json --db data/work/jobmatcher.db
+jobmatch ingest-candidate --input examples/candidate.json --db data/work/jobmatcher.db
 
 # Parse resume locally
 jobmatch parse-resume --resume data/input/resume.pdf --output data/output/parsed-resume.json
@@ -1668,4 +1777,10 @@ jobmatch report --candidate-id candidate-001 --db data/work/jobmatcher.db --outp
 
 # CSV report
 jobmatch report --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/results.csv
+
+# JSON summary
+jobmatch summarize --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/match-summary.json
+
+# CSV summary
+jobmatch summarize --candidate-id candidate-001 --db data/work/jobmatcher.db --output data/output/match-summary.csv
 ```

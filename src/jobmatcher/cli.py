@@ -9,6 +9,7 @@ from .report import write_report
 from .service import run_match
 from .util import sha256_data
 from .extraction import extract
+from .summary_report import build_summary, write_summary
 app=typer.Typer(no_args_is_help=True)
 
 @app.command("init-db")
@@ -117,6 +118,19 @@ def ingest_resume(
     init_db(db)
     upsert_candidate(db, candidate, sha256_data(candidate.model_dump(mode="json")))
     typer.echo(f"Ingested {candidate_id} from {resume}")
+
+@app.command("summarize")
+def summarize(
+    candidate_id: str = typer.Option(..., "--candidate-id", help="Candidate identifier"),
+    db: str = typer.Option("data/work/jobmatcher.db", "--db", help="SQLite database path"),
+    output: str = typer.Option(..., "--output", help="Summary output path (.json or .csv)"),
+):
+    from .db import get_jobs
+
+    _, results = run_match(db, candidate_id)
+    rows = build_summary(results, get_jobs(db))
+    write_summary(rows, output)
+    typer.echo(f"Wrote summary {output}")
 
 if __name__ == "__main__":
     app()
