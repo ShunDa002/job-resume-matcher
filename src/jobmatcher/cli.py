@@ -6,6 +6,7 @@ from .db import init_db,upsert_candidate,upsert_job
 from .models import CandidateProfile
 from .normalize import normalize_job
 from .report import write_report
+from .scraper import DEFAULT_URL as DEFAULT_SCRAPE_URL
 from .service import run_match
 from .util import sha256_data
 from .extraction import prepare_extraction, apply_extraction, EXTRACTOR
@@ -13,6 +14,13 @@ from .summary_report import build_summary, write_summary
 app=typer.Typer(no_args_is_help=True)
 
 ROOT = Path(__file__).resolve().parents[2]
+
+def _ingest_job_items(items, db: str) -> int:
+    """Store normalized job records; shared by ingest-jobs and scrape-jobs --ingest."""
+    init_db(db)
+    for item in items:
+        upsert_job(db, normalize_job(item))
+    return len(items)
 
 def _base() -> Path:
     """Repo root for prompts/schemas: the cwd when run from the repo,
@@ -25,9 +33,55 @@ def init_database(db:str=typer.Option("data/work/jobmatcher.db")):
 
 @app.command("ingest-jobs")
 def ingest_jobs(input:str=typer.Option(...),db:str=typer.Option("data/work/jobmatcher.db")):
-    init_db(db); raw=json.loads(Path(input).read_text(encoding="utf-8")); items=raw if isinstance(raw,list) else raw["jobs"]
-    for item in items: upsert_job(db,normalize_job(item))
-    typer.echo(f"Ingested {len(items)} jobs")
+    raw=json.loads(Path(input).read_text(encoding="utf-8")); items=raw if isinstance(raw,list) else raw["jobs"]
+    n=_ingest_job_items(items,db)
+    typer.echo(f"Ingested {n} jobs")
+
+@app.command("scrape-jobs")
+def scrape_jobs(
+    url: str = typer.Option(DEFAULT_SCRAPE_URL, "--url", help="JobStreet search URL to scrape"),
+    max_pages: int = typer.Option(2, "--max-pages", min=0, help="Pages to scrape; 0 means no limit"),
+    headless: bool = typer.Option(True, "--headless/--no-headless", help="Run Chromium headless"),
+    output: str = typer.Option("data/input/jobstreet_ai_jobs.jsonl", "--output", help="JSONL output path (a .json copy is written alongside it)"),
+    recycle_interval: int = typer.Option(50, "--recycle-interval", min=1, help="Recycle the browser context every N pages"),
+    append: bool = typer.Option(False, "--append", help="Append to an existing JSONL file instead of overwriting it"),
+    ingest: bool = typer.Option(False, "--ingest", help="Also ingest the scraped jobs into the database"),
+    db: str = typer.Option("data/work/jobmatcher.db", "--db"),
+):
+    """Scrape JobStreet listings to JSON (Playwright + Chromium).
+
+    Writes <output> (.jsonl, one job per line) plus the converted .json
+    next to it, in the format `ingest-jobs` accepts, so a scraped file
+    feeds straight into the matching pipeline. With --ingest the
+    scraped jobs are also stored in the database.
+
+    Requires the optional scrape dependency: `pip install -e '.[scrape]'`
+    and `playwright install chromium`.
+    """
+    from .scraper import scrape_jobstreet
+
+    try:
+        count = scrape_jobstreet(
+            target_url=url,
+            max_pages=max_pages or None,
+            headless=headless,
+            output_file=output,
+            recycle_interval=recycle_interval,
+            append=append,
+        )
+    except RuntimeError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(code=1)
+    json_path = str(Path(output).with_suffix(".json"))
+    typer.echo(json.dumps({"scraped": count, "jsonl": output, "json": json_path}, indent=2))
+    if ingest:
+        if not Path(json_path).exists():
+            typer.echo("Nothing scraped; no JSON file to ingest.", err=True)
+            return
+        raw = json.loads(Path(json_path).read_text(encoding="utf-8"))
+        items = raw if isinstance(raw, list) else raw["jobs"]
+        n = _ingest_job_items(items, db)
+        typer.echo(f"Ingested {n} jobs into {db}")
 
 @app.command("ingest-candidate")
 def ingest_candidate(input:str=typer.Option(...),db:str=typer.Option("data/work/jobmatcher.db")):

@@ -23,3 +23,8 @@ This repository implements Phase 1 of a universal job-to-resume matcher.
 - `assessment_confidence` scales with the requirement count (full at 8+); fewer than 5 requirements is flagged `thin_evidence` in reports.
 - An 'or' list in a job description is ONE requirement with alternatives, never several requirements; `apply-jobs` records same-evidence requirements as warnings in `validation.json`, not errors.
 - `scripts/demo.sh` uses candidate-demo, never candidate-001, so running the demo cannot overwrite a real candidate-001 resume bundle.
+- Scraping (`src/jobmatcher/scraper.py`, `jobmatch scrape-jobs`) is an
+  optional input step: it fetches public JobStreet listings into the
+  JSON format `ingest-jobs` accepts. Playwright is an optional extra
+  (`.[scrape]`); importing the scraper must not require it. Scraping
+  never touches matching, scoring, eligibility, or extraction.

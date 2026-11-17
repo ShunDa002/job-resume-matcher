@@ -18,9 +18,15 @@ fi
 
 python3 -m venv .venv
 ./.venv/bin/pip install -q --upgrade pip
-./.venv/bin/pip install -q -e '.[dev]'
+./.venv/bin/pip install -q -e '.[dev,scrape]'
+# Browser binary for scrape-jobs (large download; only needed for scraping).
+if ! ./.venv/bin/playwright install chromium >/dev/null 2>&1; then
+  echo "Note: Chromium for scraping could not be installed automatically."
+  echo "  Run this when you need it: ./.venv/bin/playwright install chromium"
+fi
 echo
 echo "Setup done."
 echo "  Activate:  source .venv/bin/activate"
 echo "  Demo:      bash scripts/demo.sh"
+echo "  Scrape:    ./.venv/bin/jobmatch scrape-jobs --max-pages 1"
 echo "  Tests:     ./.venv/bin/python -m pytest -q"

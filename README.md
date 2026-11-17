@@ -65,9 +65,49 @@ source .venv/bin/activate
 # 2. Install package and dependencies in editable mode
 pip install -e '.[dev]'
 
+# For job scraping (optional): Playwright + a Chromium binary
+pip install -e '.[dev,scrape]'
+playwright install chromium
+
 # 3. Generate candidate JSON schema
 python scripts/generate_schema.py
 ```
+
+---
+
+## Scraping jobs from JobStreet
+
+`jobmatch scrape-jobs` fetches public JobStreet (Singapore) listings with
+Playwright + Chromium and writes them in the exact JSON format
+`ingest-jobs` accepts, so a scraped file feeds straight into matching:
+
+```bash
+# One page of AI jobs, saved to data/input/jobstreet_ai_jobs.jsonl + .json
+jobmatch scrape-jobs --max-pages 1
+
+# Scrape and ingest straight into the database
+jobmatch scrape-jobs --max-pages 5 --ingest --db data/work/jobmatcher.db
+
+# A different search (any JobStreet SG search URL works)
+jobmatch scrape-jobs --url "https://sg.jobstreet.com/data-analyst-jobs/full-time" --max-pages 3
+```
+
+Options: `--url` (default: AI jobs, full-time, recent), `--max-pages`
+(0 = no limit), `--headless/--no-headless`, `--output` (JSONL path; a
+`.json` copy is written alongside), `--recycle-interval` (browser context
+recycled every N pages, default 50), `--append`, `--ingest`, `--db`.
+
+Scraping is an input step only: it never touches matching, scoring,
+eligibility, or extraction, and the tool's core works without Playwright
+installed (`setup.sh` installs the scrape extra and Chromium for you).
+
+Notes: each page is flushed to the JSONL file as it is scraped, so a
+crash keeps earlier pages; `total_job_index` counts only jobs actually
+saved. If the network blocks JobStreet (e.g. a sandbox egress proxy),
+the command logs the block, writes an empty JSON file, and reports
+`{"scraped": 0, ...}` instead of crashing. JobStreet's markup is matched
+by `data-automation` selectors, so the scraper needs updating if
+JobStreet redesigns its pages.
 
 ---
 
