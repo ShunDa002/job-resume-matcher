@@ -37,6 +37,9 @@ def test_build_summary_contains_only_requested_fields():
         "job_id",
         "eligibility",
         "final_match_score",
+        "assessment_confidence",
+        "requirement_count",
+        "thin_evidence",
         "requirements",
         "jobstreet_url",
     ]

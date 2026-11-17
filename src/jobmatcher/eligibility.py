@@ -19,4 +19,10 @@ def determine_eligibility(candidate:CandidateProfile,job:JobRecord,policy:dict):
         reasons.append(f"Candidate has less than the required {job.minimum_experience_years:g} years.")
     if candidate.target_employment_types and job.employment_type not in candidate.target_employment_types:
         reasons.append(f"Employment type '{job.employment_type}' is outside candidate targets.")
+    # Nothing extractable at all: no requirements, no degree, no
+    # experience minimum. There is nothing to score, so this is not a
+    # match of any kind -- not even a conditional one. A score averaged
+    # over zero requirements would be a vacuous 100.
+    if not job.requirements and not job.degree_fields and job.minimum_experience_years is None:
+        return EligibilityStatus.INSUFFICIENT_INFORMATION,["No requirements, degree, or experience minimum could be extracted from the job description; there is nothing to score."],"not_applicable"
     return (EligibilityStatus.CONDITIONALLY_ELIGIBLE if reasons else EligibilityStatus.ELIGIBLE),reasons,risk

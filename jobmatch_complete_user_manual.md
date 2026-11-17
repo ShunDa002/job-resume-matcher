@@ -1,3 +1,12 @@
+> **Note (2026-11-17): the adapter layer described in this document was removed.**
+> Extraction is now Muse-native: there are no Antigravity / Claude / Codex / Copilot
+> adapters, no subprocess agent calls, and no model API calls in the code. Muse reads
+> the prompt bundle prepared by `jobmatch prepare-jobs` / `prepare-resume`, writes
+> `extraction.json`, and `jobmatch apply-jobs` / `ingest-resume --extraction ...`
+> validates and commits it. See README.md ("Muse Extraction") for the current flow.
+> The rest of this document is kept as a historical spec for the deterministic
+> matching engine, schemas, and audit layout, which are unchanged.
+
 # Universal Job-to-Resume Matcher
 
 ## Complete User Manual and CLI Workflow Guide

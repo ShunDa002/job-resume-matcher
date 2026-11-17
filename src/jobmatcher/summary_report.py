@@ -55,6 +55,12 @@ def build_summary(results: list[Any], jobs: list[Any]) -> list[dict[str, Any]]:
                 "final_match_score": (
                     result.scores.final_match_score if result.scores else None
                 ),
+                "assessment_confidence": (
+                    getattr(result.scores, "assessment_confidence", None)
+                    if result.scores else None
+                ),
+                "requirement_count": getattr(result, "requirement_count", len(requirements)),
+                "thin_evidence": getattr(result, "thin_evidence", len(requirements) < 5),
                 "requirements": requirements,
                 "jobstreet_url": jobstreet_url,
             }
@@ -74,6 +80,9 @@ def write_summary(rows: list[dict[str, Any]], output: str | Path) -> None:
             "job_id",
             "eligibility",
             "final_match_score",
+            "assessment_confidence",
+            "requirement_count",
+            "thin_evidence",
             "requirements",
             "jobstreet_url",
         ]

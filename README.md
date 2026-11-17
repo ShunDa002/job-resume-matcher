@@ -1,6 +1,8 @@
 # Universal Job-to-Resume Matcher
 
-A deterministic, auditable system for matching job postings to candidate resumes. The Universal Job Matcher strictly separates probabilistic AI extraction from deterministic business logic: AI agents extract structured facts into schema-validated models, while deterministic Python code applies hard eligibility gates, evidence scoring, and stable ranking.
+A deterministic, auditable system for matching job postings to candidate resumes. The Universal Job Matcher strictly separates probabilistic AI extraction from deterministic business logic: Muse extracts structured facts into schema-validated models, while deterministic Python code applies hard eligibility gates, evidence scoring, and stable ranking.
+
+There are no external agent CLIs, no API keys, and no model calls in this codebase. Muse is the extractor, working in the loop: the code prepares a prompt bundle, Muse fills in the extraction JSON, and the code validates and commits it.
 
 ---
 
@@ -10,13 +12,13 @@ A deterministic, auditable system for matching job postings to candidate resumes
   Raw Jobs (JSON/Text)                  Resume (PDF/DOCX/DOC/TXT/MD)
           │                                           │
           ▼                                           ▼
-[Job Extraction (AI Adapter)]              [Local Document Parser]
-  (Antigravity / Claude / Codex / Copilot)            │
+[Job Extraction (Muse)]                    [Local Document Parser]
+  (prompt bundle -> extraction.json)         │
           │                                           ▼
           ▼                                 Normalized Plain Text
   Job Records (SQLite)                                │
           │                                           ▼
-          │                               [Resume Extraction (AI Adapter)]
+          │                               [Resume Extraction (Muse)]
           │                                           │
           │                                           ▼
           │                                Candidate Profile (SQLite)
@@ -111,40 +113,41 @@ The core matching engine deliberately contains **no LLM calls**. It provides a r
   - Required minimum experience years (`INELIGIBLE_EXPERIENCE`)
   - Seniority exclusions for career levels (`INELIGIBLE_SENIORITY`)
   - Target country work authorization and visa sponsorship status (`INELIGIBLE_WORK_AUTHORIZATION`)
+  - Nothing extractable at all — no requirements, no degree, no experience minimum — (`INSUFFICIENT_INFORMATION`). Such a job is unscored: a score averaged over zero requirements would be a vacuous 100.
 - **Evidence-Based Scoring**: Evaluates requirements against demonstrated evidence ([src/jobmatcher/scoring.py](file:///c/Data/ide-sbx-isolation/job-matcher/src/jobmatcher/scoring.py)):
   - Skill taxonomy aliases and transferability relationships ([config/skill-taxonomy.v1.yaml](file:///c/Data/ide-sbx-isolation/job-matcher/config/skill-taxonomy.v1.yaml))
   - Evidence weight levels: `deployed_professional`, `deployed_project`, `substantial_project`, `coursework`, `stated_only`
-  - Scoring policy weights and critical gap penalties ([config/scoring-policy.v1.yaml](file:///c/Data/ide-sbx-isolation/job-matcher/config/scoring-policy.v1.yaml))
+  - Scoring policy weights and critical gap penalties ([config/scoring-policy.v2.yaml](file:///c/Data/ide-sbx-isolation/job-matcher/config/scoring-policy.v2.yaml))
+  - **Evidence-aware confidence**: `assessment_confidence` scales with the number of extracted requirements (full confidence at 8+). A high score over 3 requirements is flagged `thin_evidence` (fewer than 5 requirements) in the report, so it is never mistaken for a well-evidenced match. Reports also list `requirement_count` and the matched vs missing requirements per job.
 - **Determinism**: Results are fully stable across runs. Decimal arithmetic and a deterministic job-ID tie breaker ensure identical ranking every time.
 
 ---
 
-## AI Extraction & Universal Adapter Layer
+## Muse Extraction
 
-Automated extraction parses unstructured job postings into structured requirements using CLI-based AI assistants:
+Extraction parses unstructured job postings into structured requirements. The extractor is Muse, in the loop, in two steps:
 
-- **Supported Adapters**: `antigravity` (default), `claude`, `codex`, and `copilot`. Custom binary paths can be specified with `--executable`.
-- **Execution & Security Boundary**: Adapters run headless with JSON output, bounded workspaces (`--add-dir`), and disabled slash commands or interactive prompts.
-- **Schema Enforcement**: Claude, Codex, and Antigravity enforce schemas natively. Copilot receives schemas within bounded prompts with `-s`, disallows interactive questions, and is validated by identical local Pydantic rules.
-- **Deterministic Caching**: Extractions are cached in SQLite keyed by a composite hash of the job content, prompt, schema, and adapter configuration. Use `--force` to bypass the cache.
-- **Auditing & Repair**: Each batch writes immutable execution artifacts to `data/output/extraction-audit/`. Malformed outputs trigger a single schema-guided repair attempt.
+1. **Prepare** — `jobmatch prepare-jobs` writes one prompt bundle per batch under `data/output/muse-extraction/<run_id>/batch-000000/`, containing `prompt.txt` (rendered from `prompts/extract-requirements.v2.md`), `input.json`, `schema.json`, and an empty `extraction.json`. Nothing is extracted yet; the batch status is `awaiting_muse`.
+2. **Apply** — Muse reads the bundle, extracts facts using only the supplied job text, and writes one JSON object matching `schemas/extraction-result.schema.json` into `extraction.json`. Then `jobmatch apply-jobs --run <run_id>` validates it with Pydantic and exact-substring evidence checks and commits valid batches to SQLite.
 
-### Adapter CLI Commands
+- **Security Boundary**: Muse receives only the job text in the bundle. It must not browse, run tools, infer sponsorship, or add facts not in the text. Resume text is likewise treated as untrusted data.
+- **Deterministic Caching**: Extractions are cached in SQLite keyed by a composite hash of the job content, prompt, schema, and extractor (`muse`). Use `--force` to bypass the cache.
+- **Auditing & Repair**: Each batch writes immutable artifacts to `data/output/muse-extraction/<run_id>/`. A batch with no `extraction.json` yet stays `awaiting_muse` and is not a failure. An invalid extraction gets a `repair-prompt.txt` and status `needs_repair`; Muse fixes `extraction.json` and `apply-jobs` is re-run. A bad batch never corrupts the database.
+
+### Muse Extraction CLI Commands
 
 ```bash
-# Probe agent availability and flags across adapters
-jobmatch probe-agent --adapter antigravity
-jobmatch probe-agent --adapter claude
-jobmatch probe-agent --adapter codex
-jobmatch probe-agent --adapter copilot
-jobmatch probe-all-agents
+# Prepare prompt bundles for uncached jobs
+jobmatch prepare-jobs --db data/work/jobmatcher.db --batch-size 5
 
-# Extract structured requirements from raw jobs into SQLite
-jobmatch extract-jobs --adapter antigravity --db data/work/jobmatcher.db --batch-size 5
-jobmatch extract-jobs --adapter claude --db data/work/jobmatcher.db
+# (Muse fills in extraction.json in each bundle)
+
+# Validate and commit Muse's extractions
+jobmatch apply-jobs --db data/work/jobmatcher.db --run run-20261117T000000Z-abc123
+
+# Check the status of the latest run
+jobmatch extraction-status
 ```
-
----
 
 ## Resume Parsing & Ingestion
 
@@ -196,20 +199,22 @@ Output structure:
 Run the end-to-end ingestion pipeline:
 
 ```bash
+# 1. Prepare the Muse bundle (parses the resume locally first)
+jobmatch prepare-resume \
+  --resume data/input/resume.pdf \
+  --candidate-id candidate-001 \
+  --overrides examples/operator-overrides.json
+
+# 2. Muse reads data/output/muse-extraction/resume/candidate-001/prompt.txt
+#    and writes extraction.json in that bundle.
+
+# 3. Validate Muse's extraction and store the candidate
 jobmatch ingest-resume \
   --resume data/input/resume.pdf \
   --candidate-id candidate-001 \
-  --adapter antigravity \
+  --extraction data/output/muse-extraction/resume/candidate-001/extraction.json \
   --overrides examples/operator-overrides.json \
   --db data/work/jobmatcher.db
-```
-
-Other adapters are selected similarly:
-
-```bash
-jobmatch ingest-resume --resume resume.docx --candidate-id candidate-001 --adapter claude
-jobmatch ingest-resume --resume resume.pdf  --candidate-id candidate-001 --adapter codex
-jobmatch ingest-resume --resume resume.docx --candidate-id candidate-001 --adapter copilot
 ```
 
 ### Operator Overrides
@@ -237,7 +242,7 @@ Format-specific local parser
 Normalized plain text & SHA-256 hash
   │
   ▼
-Selected AI adapter invocation (with candidate-profile JSON schema)
+Muse extraction (reads prompt bundle, writes extraction.json)
   │
   ▼
 Local Pydantic schema validation & exact substring evidence check
@@ -256,13 +261,15 @@ Store validated CandidateProfile in SQLite & write audit logs
 All extraction attempts and validation results are preserved immutably:
 
 ```text
-data/output/resume-audit/<adapter>/<candidate-id>/
+data/output/muse-extraction/resume/<candidate-id>/
   parsed-resume.json     # Output of local document parser
-  resume-text.txt        # Exact text sent to agent
+  resume-text.txt        # Exact text sent to Muse
+  prompt.txt             # Rendered extraction prompt
+  schema.json            # Candidate-profile JSON schema
+  extraction.json        # Muse-supplied extraction (filled in by Muse)
+  repair-prompt.txt      # Written only when validation fails
   validation.json        # Schema and substring verification log
   candidate-profile.json # Validated profile (written only on success)
-  attempt-1/             # Initial prompt, invocation arguments, stdout, stderr
-  attempt-2/             # Repair prompt and response (only if attempt 1 failed)
 ```
 
 ### PDF OCR Workflow
@@ -273,11 +280,15 @@ If `parse-resume` indicates insufficient embedded text, create a searchable PDF 
 # Example using an OCR utility
 python scripts/ocr_pdf.py data/input/resume-scanned.pdf --output data/input/resume-searchable.pdf
 
-# Ingest searchable PDF
+# Prepare, let Muse fill in extraction.json, then ingest
+jobmatch prepare-resume \
+  --resume data/input/resume-searchable.pdf \
+  --candidate-id candidate-001 \
+  --overrides examples/operator-overrides.json
 jobmatch ingest-resume \
   --resume data/input/resume-searchable.pdf \
   --candidate-id candidate-001 \
-  --adapter antigravity \
+  --extraction data/output/muse-extraction/resume/candidate-001/extraction.json \
   --overrides examples/operator-overrides.json
 ```
 
@@ -323,6 +334,9 @@ Example JSON:
     "job_id": "jobstreet_sg-95408528",
     "eligibility": "CONDITIONALLY_ELIGIBLE",
     "final_match_score": 93.69,
+    "assessment_confidence": 85.0,
+    "requirement_count": 4,
+    "thin_evidence": true,
     "requirements": [
       "Good grasp of Python [required, core, critical]",
       "React or TypeScript (alternatives: react) [required, supporting]",
@@ -343,10 +357,11 @@ Hard-ineligible jobs have `null` for `final_match_score`. If a stored job has no
 | `jobmatch ingest-jobs`      | Ingest normalized canonical job JSON into SQLite                          |
 | `jobmatch ingest-candidate` | Ingest canonical candidate profile JSON into SQLite                       |
 | `jobmatch parse-resume`     | Parse PDF/DOCX/DOC/TXT/MD resume locally to JSON without AI               |
-| `jobmatch ingest-resume`    | Parse resume, extract candidate via AI adapter, validate, and store in DB |
-| `jobmatch probe-agent`      | Probe availability and flags for a specific AI CLI agent                  |
-| `jobmatch probe-all-agents` | Check availability across all configured adapters                         |
-| `jobmatch extract-jobs`     | Extract structured requirements from raw jobs via AI adapter              |
+| `jobmatch prepare-resume`   | Parse resume locally and prepare a Muse extraction bundle                 |
+| `jobmatch ingest-resume`    | Validate Muse's resume extraction and store the candidate in DB           |
+| `jobmatch prepare-jobs`     | Prepare Muse extraction bundles for uncached jobs                         |
+| `jobmatch apply-jobs`       | Validate Muse's job extractions and commit valid batches                  |
+| `jobmatch extraction-status`| Show Muse extraction run status (awaiting / needs repair / completed)     |
 | `jobmatch match`            | Run deterministic matching and print ranked results                       |
 | `jobmatch report`           | Export detailed match results to JSON or CSV                              |
 | `jobmatch summarize`        | Export consolidated match summary to JSON or CSV                          |

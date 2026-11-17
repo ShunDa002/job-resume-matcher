@@ -126,3 +126,8 @@ class MatchResult(BaseModel):
     evidence_matches: list[EvidenceMatch]=Field(default_factory=list)
     critical_gaps: list[str]=Field(default_factory=list)
     policy_versions: dict[str,str]
+    # Evidence volume: how many requirements the score rests on.
+    # thin_evidence (fewer than 5) means the score is a weak signal
+    # even when it is high; see scoring-policy.v2 confidence.
+    requirement_count: int=0
+    thin_evidence: bool=False

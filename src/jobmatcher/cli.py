@@ -8,9 +8,16 @@ from .normalize import normalize_job
 from .report import write_report
 from .service import run_match
 from .util import sha256_data
-from .extraction import extract
+from .extraction import prepare_extraction, apply_extraction, EXTRACTOR
 from .summary_report import build_summary, write_summary
 app=typer.Typer(no_args_is_help=True)
+
+ROOT = Path(__file__).resolve().parents[2]
+
+def _base() -> Path:
+    """Repo root for prompts/schemas: the cwd when run from the repo,
+    otherwise the package location (e.g. tests run from a temp dir)."""
+    return Path.cwd() if (Path.cwd() / "schemas").exists() else ROOT
 
 @app.command("init-db")
 def init_database(db:str=typer.Option("data/work/jobmatcher.db")):
@@ -34,84 +41,52 @@ def match(candidate_id:str=typer.Option(...),db:str=typer.Option("data/work/jobm
 def report(candidate_id:str=typer.Option(...),db:str=typer.Option("data/work/jobmatcher.db"),output:str=typer.Option(...)):
     _,results=run_match(db,candidate_id); write_report(results,output); typer.echo(f"Wrote {output}")
 
-@app.command("probe-agent")
-def probe_agent(
-    adapter: str = typer.Option("antigravity", "--adapter", help="AI agent adapter name (antigravity, claude, codex, copilot)"),
-    executable: str | None = typer.Option(None, "--executable", help="Custom agent executable path"),
+@app.command("prepare-jobs")
+def prepare_jobs_cmd(
+    db: str = typer.Option("data/work/jobmatcher.db", "--db"),
+    batch_size: int = typer.Option(5, "--batch-size", min=1, max=50),
+    force: bool = typer.Option(False, "--force"),
 ):
-    from .adapters import get_adapter
-    try:
-        a = get_adapter(adapter, Path.cwd(), executable)
-    except ValueError as e:
-        raise typer.BadParameter(str(e))
-    typer.echo(json.dumps(a.probe(), indent=2))
+    """Prepare Muse extraction bundles for uncached jobs.
 
-@app.command("probe-all-agents")
-def probe_all_agents():
-    from .adapters import probe_all_adapters
-    typer.echo(json.dumps(probe_all_adapters(Path.cwd()), indent=2))
-
-@app.command("extract-jobs")
-def extract_jobs_cmd(
-    db: str = typer.Option(
-        "data/work/jobmatcher.db",
-        "--db",
-    ),
-    adapter: str = typer.Option(
-        "antigravity",
-        "--adapter",
-    ),
-    batch_size: int = typer.Option(
-        5,
-        "--batch-size",
-        min=1,
-        max=50,
-    ),
-    workers: int = typer.Option(
-        3,
-        "--workers",
-        min=1,
-        max=8,
-        help=(
-            "Maximum number of concurrent "
-            "agent batch invocations"
-        ),
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-    ),
-    executable: str | None = typer.Option(
-        None,
-        "--executable",
-    ),
-):
-    summary = extract(
-        db,
-        Path.cwd(),
-        batch_size=batch_size,
-        workers=workers,
-        force=force,
-        executable=executable,
-        adapter_name=adapter,
-    )
-
-    typer.echo(
-        json.dumps(
-            summary,
-            ensure_ascii=False,
-            indent=2,
+    Writes one bundle per batch under data/output/muse-extraction/<run_id>/
+    with prompt.txt, input.json, schema.json and an empty extraction.json.
+    Muse then fills in extraction.json; run `apply-jobs` to validate it.
+    """
+    summary = prepare_extraction(db, Path.cwd(), batch_size=batch_size, force=force)
+    typer.echo(json.dumps(summary, ensure_ascii=False, indent=2))
+    if summary["batches"]:
+        typer.echo(
+            f"Next: Muse fills in extraction.json in each bundle above, "
+            f"then run: jobmatch apply-jobs --db {db} --run {summary['run_id']}",
+            err=True,
         )
-    )
+
+@app.command("apply-jobs")
+def apply_jobs_cmd(
+    db: str = typer.Option("data/work/jobmatcher.db", "--db"),
+    run: str = typer.Option(..., "--run", help="Run ID from prepare-jobs"),
+    batch: str | None = typer.Option(None, "--batch", help="Apply one batch only, e.g. batch-000000"),
+):
+    """Validate Muse-supplied extraction.json files and commit valid batches.
+
+    Batches with no extraction.json yet stay awaiting_muse. Invalid
+    batches get repair-prompt.txt and status needs_repair; fix
+    extraction.json and re-run this command.
+    """
+    try:
+        summary = apply_extraction(db, Path.cwd(), run_id=run, batch_id=batch)
+    except FileNotFoundError as e:
+        raise typer.BadParameter(str(e))
+    typer.echo(json.dumps(summary, ensure_ascii=False, indent=2))
 
 @app.command("extraction-status")
 def extraction_status_cmd(
-    adapter: str = typer.Option("antigravity", "--adapter", help="AI agent adapter name"),
     run: str | None = typer.Option(None, "--run", help="Specific run ID to inspect"),
 ):
-    audit_base = Path.cwd() / "data" / "output" / "extraction-audit" / adapter
+    audit_base = Path.cwd() / "data" / "output" / "muse-extraction"
     if not audit_base.exists():
-        typer.echo(f"No extraction audit directory found for adapter '{adapter}'")
+        typer.echo("No Muse extraction runs found under data/output/muse-extraction")
         return
 
     if run:
@@ -122,62 +97,45 @@ def extraction_status_cmd(
     else:
         run_dirs = sorted([d for d in audit_base.iterdir() if d.is_dir() and d.name.startswith("run-")], key=lambda d: d.name)
         if not run_dirs:
-            typer.echo(f"No run directories found for adapter '{adapter}'")
+            typer.echo("No run directories found under data/output/muse-extraction")
             return
         run_dir = run_dirs[-1]
 
+    # Job batches live directly under the run dir; resume bundles live
+    # under resume/<candidate-id>/, so report both.
     batch_dirs = sorted([d for d in run_dir.iterdir() if d.is_dir() and d.name.startswith("batch-")], key=lambda d: d.name)
+    resume_dirs = sorted((run_dir / "resume").glob("*")) if (run_dir / "resume").exists() else []
 
-    statuses = []
-    completed_cnt = 0
-    running_cnt = 0
-    failed_cnt = 0
-
+    typer.echo(f"Run: {run_dir.name}")
+    typer.echo(f"Extractor: {EXTRACTOR}\n")
+    counts = {"completed": 0, "awaiting_muse": 0, "needs_repair": 0, "failed": 0}
+    lines: list[str] = []
     for b in batch_dirs:
         status_file = b / "status.json"
-        val_file = b / "validation.json"
-        b_name = b.name
+        st = "unknown"
         if status_file.exists():
             try:
-                st_data = json.loads(status_file.read_text(encoding="utf-8"))
-                st = st_data.get("status", "unknown")
-                dur = st_data.get("duration_seconds", 0.0)
-                jobs_cnt = len(st_data.get("job_ids", []))
-                if st == "completed":
-                    completed_cnt += 1
-                    statuses.append(f"{b_name} completed {jobs_cnt} jobs {dur:.1f}s")
-                elif st == "failed":
-                    failed_cnt += 1
-                    statuses.append(f"{b_name} failed {jobs_cnt} jobs {dur:.1f}s")
-                elif st == "running":
-                    running_cnt += 1
-                    statuses.append(f"{b_name} running {jobs_cnt} jobs {dur:.1f}s")
-                else:
-                    statuses.append(f"{b_name} {st}")
+                st = json.loads(status_file.read_text(encoding="utf-8")).get("status", "unknown")
             except Exception:
-                statuses.append(f"{b_name} unreadable status")
-        elif val_file.exists():
+                st = "unreadable"
+        counts[st] = counts.get(st, 0) + 1
+        lines.append(f"{b.name} {st}")
+    for r in resume_dirs:
+        status_file = r / "status.json"
+        st = "unknown"
+        if status_file.exists():
             try:
-                val_data = json.loads(val_file.read_text(encoding="utf-8"))
-                if val_data.get("valid"):
-                    completed_cnt += 1
-                    statuses.append(f"{b_name} completed {val_data.get('duration_seconds', 0.0):.1f}s")
-                else:
-                    failed_cnt += 1
-                    statuses.append(f"{b_name} failed")
+                st = json.loads(status_file.read_text(encoding="utf-8")).get("status", "unknown")
             except Exception:
-                statuses.append(f"{b_name} validation recorded")
-        else:
-            statuses.append(f"{b_name} pending")
-
-    total = len(batch_dirs)
-    typer.echo(f"Run: {run_dir.name}")
-    typer.echo(f"Adapter: {adapter}\n")
-    typer.echo(f"Completed: {completed_cnt}/{total}")
-    typer.echo(f"Running: {running_cnt}")
-    typer.echo(f"Failed: {failed_cnt}")
-    typer.echo(f"Pending: {total - completed_cnt - running_cnt - failed_cnt}\n")
-    for s in statuses:
+                st = "unreadable"
+        counts[st] = counts.get(st, 0) + 1
+        lines.append(f"resume/{r.name} {st}")
+    total = len(batch_dirs) + len(resume_dirs)
+    typer.echo(f"Completed: {counts['completed']}/{total}")
+    typer.echo(f"Awaiting Muse: {counts['awaiting_muse']}")
+    typer.echo(f"Needs repair: {counts['needs_repair']}")
+    typer.echo(f"Failed: {counts['failed']}\n")
+    for s in lines:
         typer.echo(s)
 
 @app.command("parse-resume")
@@ -192,48 +150,93 @@ def parse_resume(
     out_path.write_text(json.dumps(doc.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
     typer.echo(f"Wrote {output}")
 
-@app.command("ingest-resume")
-def ingest_resume(
+@app.command("prepare-resume")
+def prepare_resume(
     resume: str = typer.Option(..., "--resume", help="Path to resume file (PDF, DOCX, DOC, TXT, MD)"),
     candidate_id: str = typer.Option(..., "--candidate-id", help="Candidate identifier"),
-    adapter: str = typer.Option("antigravity", "--adapter", help="AI agent adapter name"),
-    db: str = typer.Option("data/work/jobmatcher.db", "--db", help="SQLite database path"),
     overrides: str | None = typer.Option(None, "--overrides", help="Path to operator overrides JSON"),
-    executable: str | None = typer.Option(None, "--executable", help="Agent executable override"),
 ):
-    from jobmatcher_resume import extract_candidate_from_resume
-    from .adapters import get_adapter
+    """Parse a resume locally and prepare a Muse extraction bundle.
 
-    try:
-        agent = get_adapter(adapter, Path.cwd(), executable)
-    except ValueError as e:
-        raise typer.BadParameter(str(e))
-
-    probe = agent.probe()
-    if not probe.get("ok"):
-        raise typer.BadParameter(f"Agent probe failed: {probe}")
-
+    Writes prompt.txt, resume-text.txt, parsed-resume.json, schema.json
+    and an empty extraction.json under
+    data/output/muse-extraction/resume/<candidate-id>/.
+    Muse fills in extraction.json; run `ingest-resume --extraction ...`
+    to validate and store it.
+    """
+    from jobmatcher_resume import prepare_resume_extraction
     res_path = Path(resume)
     if not res_path.exists():
         raise typer.BadParameter(f"Resume file not found: {resume}")
-
+    ov = {}
     if overrides:
         ov_path = Path(overrides)
         if not ov_path.exists():
             raise typer.BadParameter(f"Overrides file not found: {overrides}")
         ov = json.loads(ov_path.read_text(encoding="utf-8"))
-    else:
-        ov = {}
-    candidate, _ = extract_candidate_from_resume(
+    audit_dir = Path("data/output/muse-extraction") / "resume" / candidate_id
+    _doc, _prompt, audit = prepare_resume_extraction(
         resume_path=resume,
         candidate_id=candidate_id,
-        adapter=agent,
-        schema_path=Path("schemas/candidate-profile.schema.json"),
-        prompt_path=Path("prompts/extract-resume.v1.md"),
-        repair_prompt_path=Path("prompts/repair-resume.v1.md"),
-        audit_dir=Path("data/output/resume-audit") / adapter / candidate_id,
+        schema_path=_base() / "schemas/candidate-profile.schema.json",
+        prompt_path=_base() / "prompts/extract-resume.v1.md",
+        repair_prompt_path=_base() / "prompts/repair-resume.v1.md",
+        audit_dir=audit_dir,
         overrides=ov,
     )
+    typer.echo(f"Prepared Muse bundle for {candidate_id} at {audit}")
+    typer.echo(
+        f"Next: Muse fills in {audit / 'extraction.json'}, then run: "
+        f"jobmatch ingest-resume --resume {resume} --candidate-id {candidate_id} "
+        f"--extraction {audit / 'extraction.json'}",
+        err=True,
+    )
+
+@app.command("ingest-resume")
+def ingest_resume(
+    resume: str = typer.Option(..., "--resume", help="Path to resume file (PDF, DOCX, DOC, TXT, MD)"),
+    candidate_id: str = typer.Option(..., "--candidate-id", help="Candidate identifier"),
+    extraction: str = typer.Option(..., "--extraction", help="Path to Muse-supplied candidate-profile JSON (extraction.json from prepare-resume)"),
+    db: str = typer.Option("data/work/jobmatcher.db", "--db", help="SQLite database path"),
+    overrides: str | None = typer.Option(None, "--overrides", help="Path to operator overrides JSON"),
+):
+    """Validate Muse's resume extraction and store the candidate profile.
+
+    Run `prepare-resume` first if you do not have an extraction.json yet.
+    On validation failure this writes repair-prompt.txt into the bundle
+    and exits non-zero; have Muse fix extraction.json and re-run.
+    """
+    from jobmatcher_resume import ingest_resume_extraction
+    res_path = Path(resume)
+    if not res_path.exists():
+        raise typer.BadParameter(f"Resume file not found: {resume}")
+    ext_path = Path(extraction)
+    if not ext_path.exists():
+        raise typer.BadParameter(f"Extraction file not found: {extraction}")
+    try:
+        raw = json.loads(ext_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise typer.BadParameter(f"Extraction file is not valid JSON: {e}")
+    ov = {}
+    if overrides:
+        ov_path = Path(overrides)
+        if not ov_path.exists():
+            raise typer.BadParameter(f"Overrides file not found: {overrides}")
+        ov = json.loads(ov_path.read_text(encoding="utf-8"))
+    audit_dir = Path("data/output/muse-extraction") / "resume" / candidate_id
+    try:
+        candidate, _ = ingest_resume_extraction(
+            resume_path=resume,
+            candidate_id=candidate_id,
+            extraction=raw,
+            schema_path=_base() / "schemas/candidate-profile.schema.json",
+            prompt_path=_base() / "prompts/extract-resume.v1.md",
+            repair_prompt_path=_base() / "prompts/repair-resume.v1.md",
+            audit_dir=audit_dir,
+            overrides=ov,
+        )
+    except RuntimeError as e:
+        raise typer.BadParameter(f"{e} See repair-prompt.txt in {audit_dir}")
     init_db(db)
     upsert_candidate(db, candidate, sha256_data(candidate.model_dump(mode="json")))
     typer.echo(f"Ingested {candidate_id} from {resume}")

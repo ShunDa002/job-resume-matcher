@@ -1,0 +1,103 @@
+{
+  "candidate_id": "candidate-demo",
+  "career_level": "fresh_graduate",
+  "citizenship_country_code": null,
+  "degree_fields": [
+    "software_engineering"
+  ],
+  "domains": [
+    {
+      "category": "domain",
+      "evidence": [
+        "Deepfake image detection"
+      ],
+      "level": "deployed_project",
+      "skill_id": "computer_vision"
+    },
+    {
+      "category": "domain",
+      "evidence": [
+        "Asynchronous RAG pipeline"
+      ],
+      "level": "deployed_project",
+      "skill_id": "rag"
+    }
+  ],
+  "graduation_date": null,
+  "has_target_country_work_rights": false,
+  "metadata": {},
+  "professional_experience_years": 0,
+  "residence_country_code": null,
+  "responsibilities": [],
+  "schema_version": "candidate-profile.v1",
+  "skills": [
+    {
+      "category": "technical_skills",
+      "evidence": [
+        "Deepfake detection and RAG projects"
+      ],
+      "level": "deployed_project",
+      "skill_id": "python"
+    },
+    {
+      "category": "technical_skills",
+      "evidence": [
+        "Web application development"
+      ],
+      "level": "substantial_project",
+      "skill_id": "typescript"
+    },
+    {
+      "category": "technical_skills",
+      "evidence": [
+        "Deepfake model fine-tuning"
+      ],
+      "level": "deployed_project",
+      "skill_id": "pytorch"
+    },
+    {
+      "category": "technical_skills",
+      "evidence": [
+        "SPM History RAG pipeline"
+      ],
+      "level": "deployed_project",
+      "skill_id": "langchain"
+    },
+    {
+      "category": "technical_skills",
+      "evidence": [
+        "Supabase vector database"
+      ],
+      "level": "deployed_project",
+      "skill_id": "supabase_vector"
+    },
+    {
+      "category": "tools_deployment",
+      "evidence": [
+        "Backend application framework"
+      ],
+      "level": "substantial_project",
+      "skill_id": "fastapi"
+    },
+    {
+      "category": "tools_deployment",
+      "evidence": [
+        "Containerized deepfake application"
+      ],
+      "level": "deployed_project",
+      "skill_id": "docker"
+    },
+    {
+      "category": "technical_skills",
+      "evidence": [
+        "Web development framework"
+      ],
+      "level": "substantial_project",
+      "skill_id": "nextjs"
+    }
+  ],
+  "soft_skills": [],
+  "target_employment_types": [
+    "full_time"
+  ]
+}

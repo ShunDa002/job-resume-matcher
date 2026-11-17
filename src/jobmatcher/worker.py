@@ -1,23 +1,23 @@
+"""Shared extraction helpers: batching, validation, and DB commit.
+
+There is no agent subprocess here, and no model call anywhere in this
+codebase. Extraction is done by Muse, in the loop: Muse reads a prompt
+bundle prepared by ``extraction.prepare_extraction`` and writes
+``extraction.json`` into that bundle. This module only validates what
+Muse supplied (Pydantic schema + exact-substring evidence checks) and
+commits valid facts to SQLite. The deterministic matching engine is
+untouched by extraction and still contains no LLM calls.
+"""
 from __future__ import annotations
 
-from concurrent.futures import (
-    ThreadPoolExecutor,
-    as_completed,
-)
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
-from pathlib import Path
-import random
 import sqlite3
-import time
-from time import monotonic
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Generator, Sequence
 
 from pydantic import ValidationError
-import typer
 
-from .adapters import create_adapter
 from .db import connect
 from .extraction_models import ExtractionResult, XJob
 from .models import JobRecord, Requirement
@@ -35,33 +35,6 @@ class BatchExtractionResult:
     errors: list[Any]
     attempts: int
     duration_seconds: float
-
-
-def is_retryable_error(error_message: Any) -> bool:
-    err = str(error_message).lower()
-    retryable_keywords = [
-        "timeout",
-        "429",
-        "rate limit",
-        "rate_limit",
-        "service unavailable",
-        "503",
-        "network reset",
-        "connection reset",
-        "terminated",
-    ]
-    return any(k in err for k in retryable_keywords)
-
-
-def retry_delay(
-    attempt: int,
-    base_seconds: float = 2.0,
-    max_seconds: float = 60.0,
-    jitter_max: float = 1.5,
-) -> float:
-    base = min(max_seconds, base_seconds * (2 ** (attempt - 1)))
-    jitter = random.uniform(0, jitter_max)
-    return base + jitter
 
 
 def ensure_extraction_cache_table(connection: sqlite3.Connection) -> None:
@@ -159,10 +132,42 @@ def verify(x: ExtractionResult, inputs: list[dict[str, Any]]) -> list[str]:
     return errs
 
 
+def duplicate_evidence_warnings(x: ExtractionResult) -> list[dict[str, Any]]:
+    """Non-blocking warnings: two requirements in one job sharing the
+    same original_text. Usually an 'or' list split into separate
+    requirements instead of one requirement with alternatives (see the
+    extraction prompt). Distinct skills joined by 'and' legitimately
+    share one evidence sentence, so this warns instead of failing --
+    the extractor (Muse) decides whether a merge is right.
+    """
+    warnings = []
+    for j in x.jobs:
+        seen: dict[str, list[Any]] = {}
+        for r in j.requirements:
+            seen.setdefault(" ".join(r.original_text.split()), []).append(r)
+        for text, reqs in seen.items():
+            if len(reqs) > 1:
+                warnings.append({
+                    "job_id": j.job_id,
+                    "original_text": text,
+                    "requirement_ids": [r.requirement_id for r in reqs],
+                    "canonical_values": [r.canonical_value for r in reqs],
+                })
+    return warnings
+
+
 def validate_agent_result(
     result: Any,
     input_jobs: list[dict[str, Any]],
 ) -> tuple[ExtractionResult | None, list[Any]]:
+    """Validate Muse-supplied extraction JSON.
+
+    Accepts a raw dict (the parsed ``extraction.json``), or a
+    ``(raw, errors)`` tuple for callers that already unpacked it.
+    Returns ``(parsed, [])`` on success, otherwise ``(parsed_or_None,
+    errors)`` where ``parsed`` is set when the schema parsed but the
+    evidence check failed, so the repair prompt can quote it.
+    """
     if hasattr(result, "data"):
         raw = result.data
         errors = list(getattr(result, "errors", []))
@@ -188,27 +193,6 @@ def validate_agent_result(
         return parsed, verify_errors
 
     return parsed, []
-
-
-def format_progress_message(
-    *,
-    completed_count: int,
-    total_batches: int,
-    result: BatchExtractionResult,
-) -> str:
-    status = (
-        "completed"
-        if result.valid
-        else "failed"
-    )
-
-    return (
-        f"[{completed_count}/{total_batches}] "
-        f"{result.batch_id} {status}: "
-        f"{len(result.job_keys)} jobs, "
-        f"{result.duration_seconds:.1f}s, "
-        f"{result.attempts} attempt(s)"
-    )
 
 
 def make_batches(
@@ -242,218 +226,6 @@ def make_batches(
 
     if batch:
         yield batch
-
-
-def process_batch(
-    *,
-    batch_number: int,
-    chunk: list[tuple[JobRecord, str]],
-    adapter_name: str,
-    adapter_config: dict[str, Any],
-    workspace: Path,
-    executable: str | None,
-    schema_path: Path,
-    prompt_path: Path,
-    repair_path: Path,
-    run_id: str | None = None,
-) -> BatchExtractionResult:
-    batch_id = f"batch-{batch_number:06d}"
-
-    if run_id:
-        audit_dir = (
-            workspace
-            / "data"
-            / "output"
-            / "extraction-audit"
-            / adapter_name
-            / run_id
-            / batch_id
-        )
-    else:
-        audit_dir = (
-            workspace
-            / "data"
-            / "output"
-            / "extraction-audit"
-            / adapter_name
-            / batch_id
-        )
-
-    audit_dir.mkdir(parents=True, exist_ok=True)
-
-    input_jobs = [
-        {
-            "job_id": job.job_id,
-            "title": job.title,
-            "company": job.company,
-            "location_country_code": job.location_country_code,
-            "description": job.description,
-        }
-        for job, _ in chunk
-    ]
-
-    input_object = {
-        "schema_version": "extraction-input.v1",
-        "jobs": input_jobs,
-    }
-
-    (audit_dir / "input.json").write_text(
-        json.dumps(
-            input_object,
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-    status_path = audit_dir / "status.json"
-    try:
-        status_path.write_text(
-            json.dumps(
-                {
-                    "batch_id": batch_id,
-                    "status": "running",
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                    "attempt": 1,
-                    "job_ids": [job.job_id for job, _ in chunk],
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
-
-    adapter = create_adapter(
-        adapter_name,
-        adapter_config,
-        workspace,
-        executable,
-    )
-
-    started = monotonic()
-    prompt = render_prompt(prompt_path, input_object)
-
-    max_retries = 3
-    result: Any = None
-
-    for retry_idx in range(1, max_retries + 1):
-        attempt_dir = audit_dir / ("attempt-1" if retry_idx == 1 else f"attempt-1-retry-{retry_idx}")
-        raw, invoke_errs = adapter.invoke(
-            prompt,
-            schema_path,
-            attempt_dir,
-        )
-        result = (raw, invoke_errs)
-        if invoke_errs:
-            err_str = " ".join(str(e) for e in invoke_errs)
-            if retry_idx < max_retries and is_retryable_error(err_str):
-                time.sleep(retry_delay(retry_idx))
-                continue
-        break
-
-    parsed, errors = validate_agent_result(
-        result,
-        input_jobs,
-    )
-
-    attempts = 1
-
-    if errors:
-        attempts = 2
-        try:
-            status_path.write_text(
-                json.dumps(
-                    {
-                        "batch_id": batch_id,
-                        "status": "running",
-                        "started_at": datetime.now(timezone.utc).isoformat(),
-                        "attempt": 2,
-                        "job_ids": [job.job_id for job, _ in chunk],
-                    },
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-        except Exception:
-            pass
-
-        raw_data = result[0] if isinstance(result, tuple) else getattr(result, "data", None)
-        repair_prompt = render_repair_prompt(
-            repair_path,
-            input_object,
-            errors,
-            raw_data,
-        )
-
-        repaired_result: Any = None
-        for retry_idx in range(1, max_retries + 1):
-            attempt_dir = audit_dir / ("attempt-2" if retry_idx == 1 else f"attempt-2-retry-{retry_idx}")
-            repaired_raw, repaired_errs = adapter.invoke(
-                repair_prompt,
-                schema_path,
-                attempt_dir,
-            )
-            repaired_result = (repaired_raw, repaired_errs)
-            if repaired_errs:
-                err_str = " ".join(str(e) for e in repaired_errs)
-                if retry_idx < max_retries and is_retryable_error(err_str):
-                    time.sleep(retry_delay(retry_idx))
-                    continue
-            break
-
-        parsed, errors = validate_agent_result(
-            repaired_result,
-            input_jobs,
-        )
-
-    duration = monotonic() - started
-
-    (audit_dir / "validation.json").write_text(
-        json.dumps(
-            {
-                "valid": not errors and parsed is not None,
-                "errors": errors,
-                "duration_seconds": round(duration, 2),
-                "attempts": attempts,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-    try:
-        status_path.write_text(
-            json.dumps(
-                {
-                    "batch_id": batch_id,
-                    "status": "completed" if (not errors and parsed is not None) else "failed",
-                    "duration_seconds": round(duration, 2),
-                    "attempts": attempts,
-                    "job_ids": [job.job_id for job, _ in chunk],
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
-
-    return BatchExtractionResult(
-        batch_id=batch_id,
-        job_keys=[
-            (job.job_id, task_key)
-            for job, task_key in chunk
-        ],
-        extracted_jobs=(
-            parsed.jobs if parsed and not errors else []
-        ),
-        valid=not errors and parsed is not None,
-        errors=errors,
-        attempts=attempts,
-        duration_seconds=round(duration, 2),
-    )
 
 
 def commit_batch(
@@ -535,190 +307,3 @@ def commit_batch(
         raise
     finally:
         connection.close()
-
-
-def execute_batches_parallel(
-    *,
-    pending: list[tuple[JobRecord, str]],
-    batch_size: int,
-    workers: int,
-    process_kwargs: dict[str, Any],
-    db_path: str | None = None,
-    jobs_by_id: dict[str, JobRecord] | None = None,
-    cache_metadata: dict[str, str] | None = None,
-    submission_delay_seconds: float = 0.0,
-) -> tuple[list[BatchExtractionResult], list[BatchExtractionResult]]:
-    batches = list(make_batches(pending, maximum_jobs=batch_size))
-    if not batches:
-        return [], []
-
-    completed_batches: list[BatchExtractionResult] = []
-    failed_batches: list[BatchExtractionResult] = []
-
-    max_workers = max(1, min(workers, len(batches)))
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {}
-        for batch_number, chunk in enumerate(batches):
-            future = executor.submit(
-                process_batch,
-                batch_number=batch_number,
-                chunk=chunk,
-                **process_kwargs,
-            )
-            futures[future] = (batch_number, chunk)
-
-            if submission_delay_seconds > 0 and workers > 1 and batch_number < len(batches) - 1:
-                time.sleep(submission_delay_seconds)
-
-        total = len(futures)
-
-        for completed_count, future in enumerate(
-            as_completed(futures),
-            start=1,
-        ):
-            batch_number, chunk = futures[future]
-            try:
-                result = future.result()
-            except Exception as error:
-                result = BatchExtractionResult(
-                    batch_id=f"batch-{batch_number:06d}",
-                    job_keys=[(job.job_id, task_key) for job, task_key in chunk],
-                    extracted_jobs=[],
-                    valid=False,
-                    errors=[
-                        {
-                            "error": str(error),
-                            "type": error.__class__.__name__,
-                        }
-                    ],
-                    attempts=1,
-                    duration_seconds=0.0,
-                )
-
-            if result.valid:
-                if db_path and jobs_by_id is not None and cache_metadata is not None:
-                    try:
-                        commit_batch(
-                            db_path=db_path,
-                            result=result,
-                            jobs_by_id=jobs_by_id,
-                            cache_metadata=cache_metadata,
-                        )
-                        completed_batches.append(result)
-                    except Exception as commit_error:
-                        result.valid = False
-                        result.errors.append({
-                            "error": f"Database commit failed: {commit_error}",
-                            "type": commit_error.__class__.__name__,
-                        })
-                        failed_batches.append(result)
-                else:
-                    completed_batches.append(result)
-            else:
-                failed_batches.append(result)
-
-            typer.echo(
-                format_progress_message(
-                    completed_count=completed_count,
-                    total_batches=total,
-                    result=result,
-                ),
-                err=True,
-            )
-
-    return completed_batches, failed_batches
-
-
-
-def execute_batches_parallel(
-    *,
-    pending: list[tuple[JobRecord, str]],
-    batch_size: int,
-    workers: int,
-    process_kwargs: dict[str, Any],
-    db_path: str | None = None,
-    jobs_by_id: dict[str, JobRecord] | None = None,
-    cache_metadata: dict[str, str] | None = None,
-    submission_delay_seconds: float = 0.0,
-) -> tuple[list[BatchExtractionResult], list[BatchExtractionResult]]:
-    batches = list(make_batches(pending, maximum_jobs=batch_size))
-    if not batches:
-        return [], []
-
-    completed_batches: list[BatchExtractionResult] = []
-    failed_batches: list[BatchExtractionResult] = []
-
-    max_workers = max(1, min(workers, len(batches)))
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {}
-        for batch_number, chunk in enumerate(batches):
-            future = executor.submit(
-                process_batch,
-                batch_number=batch_number,
-                chunk=chunk,
-                **process_kwargs,
-            )
-            futures[future] = (batch_number, chunk)
-
-            if submission_delay_seconds > 0 and workers > 1 and batch_number < len(batches) - 1:
-                time.sleep(submission_delay_seconds)
-
-        total = len(futures)
-
-        for completed_count, future in enumerate(
-            as_completed(futures),
-            start=1,
-        ):
-            batch_number, chunk = futures[future]
-            try:
-                result = future.result()
-            except Exception as error:
-                result = BatchExtractionResult(
-                    batch_id=f"batch-{batch_number:06d}",
-                    job_keys=[(job.job_id, task_key) for job, task_key in chunk],
-                    extracted_jobs=[],
-                    valid=False,
-                    errors=[
-                        {
-                            "error": str(error),
-                            "type": error.__class__.__name__,
-                        }
-                    ],
-                    attempts=1,
-                    duration_seconds=0.0,
-                )
-
-            if result.valid:
-                if db_path and jobs_by_id is not None and cache_metadata is not None:
-                    try:
-                        commit_batch(
-                            db_path=db_path,
-                            result=result,
-                            jobs_by_id=jobs_by_id,
-                            cache_metadata=cache_metadata,
-                        )
-                        completed_batches.append(result)
-                    except Exception as commit_error:
-                        result.valid = False
-                        result.errors.append({
-                            "error": f"Database commit failed: {commit_error}",
-                            "type": commit_error.__class__.__name__,
-                        })
-                        failed_batches.append(result)
-                else:
-                    completed_batches.append(result)
-            else:
-                failed_batches.append(result)
-
-            typer.echo(
-                format_progress_message(
-                    completed_count=completed_count,
-                    total_batches=total,
-                    result=result,
-                ),
-                err=True,
-            )
-
-    return completed_batches, failed_batches

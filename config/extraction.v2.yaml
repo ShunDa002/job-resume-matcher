@@ -1,0 +1,12 @@
+version: extraction.v2
+# The only extractor. Muse reads the prompt bundle prepared by
+# `jobmatch prepare-jobs` / `prepare-resume` and writes extraction.json.
+# There are no external agent CLIs, no API keys, and no model calls
+# in this codebase.
+extractor: muse
+prompt_jobs: prompts/extract-requirements.v2.md
+prompt_jobs_repair: prompts/repair-extraction.v1.md
+prompt_resume: prompts/extract-resume.v1.md
+prompt_resume_repair: prompts/repair-resume.v1.md
+schema_jobs: schemas/extraction-result.schema.json
+schema_resume: schemas/candidate-profile.schema.json

@@ -56,9 +56,11 @@ def _career_score(candidate,job):
     return 20.0
 
 def score_job(candidate,job,eligibility,reasons,risk,score_policy,taxonomy,versions):
-    hard={EligibilityStatus.INELIGIBLE_CITIZENSHIP,EligibilityStatus.INELIGIBLE_EXPERIENCE,EligibilityStatus.INELIGIBLE_SENIORITY,EligibilityStatus.INELIGIBLE_WORK_AUTHORIZATION}
+    n_req=len(job.requirements)
+    thin=n_req<5
+    hard={EligibilityStatus.INELIGIBLE_CITIZENSHIP,EligibilityStatus.INELIGIBLE_EXPERIENCE,EligibilityStatus.INELIGIBLE_SENIORITY,EligibilityStatus.INELIGIBLE_WORK_AUTHORIZATION,EligibilityStatus.INSUFFICIENT_INFORMATION}
     if eligibility in hard:
-        return MatchResult(candidate_id=candidate.candidate_id,job_id=job.job_id,eligibility_status=eligibility,eligibility_reasons=reasons,work_authorization_risk=risk,scores=None,policy_versions=versions)
+        return MatchResult(candidate_id=candidate.candidate_id,job_id=job.job_id,eligibility_status=eligibility,eligibility_reasons=reasons,work_authorization_risk=risk,scores=None,policy_versions=versions,requirement_count=n_req,thin_evidence=thin)
     matches=[_match_requirement(r,candidate,score_policy,taxonomy) for r in job.requirements]
     vals={c:_category_score(job.requirements,matches,score_policy,c) for c in CATS}
     vals["education"]=_education_score(candidate,job); vals["career_level"]=_career_score(candidate,job)
@@ -68,8 +70,13 @@ def score_job(candidate,job,eligibility,reasons,risk,score_policy,taxonomy,versi
     penalty=float(p["one"] if n==1 else p["two"] if n==2 else 0)
     final=max(0,weighted-penalty)
     if n>=3: final=min(final,float(p["three_or_more_score_cap"]))
-    confidence=90.0
-    if job.data_quality_flags: confidence-=min(20,5*len(job.data_quality_flags))
-    if job.sponsorship=="unknown" and job.location_country_code!=candidate.citizenship_country_code: confidence-=5
+    # Confidence scales with evidence volume: a score averaged over 3
+    # requirements is far less trustworthy than one over 8+. The
+    # deductions below match scoring-policy.v2 `confidence`.
+    conf=score_policy.get("confidence",{})
+    base=float(conf.get("base",90.0)); full=int(conf.get("full_evidence_requirements",8))
+    confidence=base*min(1.0,n_req/full) if full else base
+    if job.data_quality_flags: confidence-=min(float(conf.get("data_quality_flag_cap",20)),float(conf.get("data_quality_flag_penalty",5))*len(job.data_quality_flags))
+    if job.sponsorship=="unknown" and job.location_country_code!=candidate.citizenship_country_code: confidence-=float(conf.get("unknown_sponsorship_penalty",5))
     scores=MatchScores(**{k:decimal_round(vals[k]) for k in CATS},career_level=decimal_round(vals["career_level"]),pre_penalty_total=decimal_round(weighted),penalty=decimal_round(penalty),final_match_score=decimal_round(final),assessment_confidence=decimal_round(max(0,confidence)))
-    return MatchResult(candidate_id=candidate.candidate_id,job_id=job.job_id,eligibility_status=eligibility,eligibility_reasons=reasons,work_authorization_risk=risk,scores=scores,evidence_matches=matches,critical_gaps=critical,policy_versions=versions)
+    return MatchResult(candidate_id=candidate.candidate_id,job_id=job.job_id,eligibility_status=eligibility,eligibility_reasons=reasons,work_authorization_risk=risk,scores=scores,evidence_matches=matches,critical_gaps=critical,policy_versions=versions,requirement_count=n_req,thin_evidence=thin)

@@ -1,3 +1,12 @@
+> **Note (2026-11-17): the adapter layer described in this document was removed.**
+> Extraction is now Muse-native: there are no Antigravity / Claude / Codex / Copilot
+> adapters, no subprocess agent calls, and no model API calls in the code. Muse reads
+> the prompt bundle prepared by `jobmatch prepare-jobs` / `prepare-resume`, writes
+> `extraction.json`, and `jobmatch apply-jobs` / `ingest-resume --extraction ...`
+> validates and commits it. See README.md ("Muse Extraction") for the current flow.
+> The rest of this document is kept as a historical spec for the deterministic
+> matching engine, schemas, and audit layout, which are unchanged.
+
 Yes. The main speedup is to move from a single sequential batch loop to a bounded worker pool, while preserving independent cache commits and audit directories. I’ll outline a safe concurrency design, rate-limit controls, retry behavior, and the exact CLI changes needed so parallel runs do not corrupt SQLite or overwrite batch artifacts.Yes. The safest and most effective improvement is bounded parallel batch execution in the Python orchestrator.
 
 For 30 jobs split into six batches, four concurrent workers can reduce the critical path from six sequential AI calls to roughly two waves of calls. If each call takes 3 to 5 minutes, total extraction time can potentially decrease from approximately 20 to 30 minutes to around 6 to 12 minutes, subject to provider quota, throttling, and local resource limits.

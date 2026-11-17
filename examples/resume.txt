@@ -1,0 +1,14 @@
+Shon Da
+Software Engineering student
+
+Projects
+- Deepfake detection and RAG projects using Python, PyTorch and LangChain.
+- Deepfake image detection with a fine-tuned model.
+- Deepfake model fine-tuning with PyTorch.
+- Asynchronous RAG pipeline for SPM History, the SPM History RAG pipeline, using LangChain and a Supabase vector database.
+- Web application development with TypeScript and Next.js.
+- Web development framework: Next.js.
+- Backend application framework: FastAPI.
+- Containerized deepfake application with Docker.
+
+Skills: Python, TypeScript, PyTorch, LangChain, FastAPI, Docker, Next.js.
