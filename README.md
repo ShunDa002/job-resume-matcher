@@ -84,7 +84,7 @@ Or execute the steps manually with the `jobmatch` CLI:
 jobmatch init-db --db data/work/jobmatcher.db
 
 # Ingest normalized jobs and candidate profile
-jobmatch ingest-jobs --input examples/jobs.json --db data/work/jobmatcher.db
+jobmatch ingest-jobs --input data/input/jobs_1.json --db data/work/jobmatcher.db
 jobmatch ingest-candidate --input examples/candidate.json --db data/work/jobmatcher.db
 
 # Run deterministic matching

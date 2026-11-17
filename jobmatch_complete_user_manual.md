@@ -448,7 +448,8 @@ jobmatch ingest-resume \
 jobmatch extract-jobs \
   --adapter antigravity \
   --db data/work/jobmatcher.db \
-  --batch-size 5
+  --batch-size 5 \
+  --workers 3
 
 jobmatch match \
   --candidate-id candidate-001 \
@@ -1112,24 +1113,24 @@ jobmatch summarize \
 
 ### Options
 
-| Option | Required | Default | Description |
-|---|---|---|---|
-| `--candidate-id` | Yes | - | Candidate identifier to match against stored jobs |
-| `--db` | No | `data/work/jobmatcher.db` | Path to the SQLite database |
-| `--output` | Yes | - | Output file path (`.json` or `.csv`) |
+| Option           | Required | Default                   | Description                                       |
+| ---------------- | -------- | ------------------------- | ------------------------------------------------- |
+| `--candidate-id` | Yes      | -                         | Candidate identifier to match against stored jobs |
+| `--db`           | No       | `data/work/jobmatcher.db` | Path to the SQLite database                       |
+| `--output`       | Yes      | -                         | Output file path (`.json` or `.csv`)              |
 
 ### Summary Fields
 
 Each record in the summary output contains:
 
-| Field | Type | Description |
-|---|---|---|
-| `rank` | integer | Candidate's rank position (1-indexed, deterministic tie-breaking) |
-| `job_id` | string | Normalized job identifier (e.g. `jobstreet_sg-95455412`) |
-| `eligibility` | string | Gate status (`ELIGIBLE`, `INELIGIBLE_CITIZENSHIP`, `INELIGIBLE_EXPERIENCE`, `INELIGIBLE_SENIORITY`, `INELIGIBLE_WORK_AUTHORIZATION`) |
-| `final_match_score` | float \| null | Weighted requirement match score (null if ineligible) |
-| `requirements` | list[string] | Formatted requirements with annotations, e.g. `Python [required, core, critical]` |
-| `jobstreet_url` | string \| null | Direct canonical URL to the job advertisement |
+| Field               | Type           | Description                                                                                                                          |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `rank`              | integer        | Candidate's rank position (1-indexed, deterministic tie-breaking)                                                                    |
+| `job_id`            | string         | Normalized job identifier (e.g. `jobstreet_sg-95455412`)                                                                             |
+| `eligibility`       | string         | Gate status (`ELIGIBLE`, `INELIGIBLE_CITIZENSHIP`, `INELIGIBLE_EXPERIENCE`, `INELIGIBLE_SENIORITY`, `INELIGIBLE_WORK_AUTHORIZATION`) |
+| `final_match_score` | float \| null  | Weighted requirement match score (null if ineligible)                                                                                |
+| `requirements`      | list[string]   | Formatted requirements with annotations, e.g. `Python [required, core, critical]`                                                    |
+| `jobstreet_url`     | string \| null | Direct canonical URL to the job advertisement                                                                                        |
 
 ### JSON summary
 

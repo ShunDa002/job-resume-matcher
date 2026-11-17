@@ -53,13 +53,132 @@ def probe_all_agents():
 
 @app.command("extract-jobs")
 def extract_jobs_cmd(
-    db: str = typer.Option("data/work/jobmatcher.db", "--db", help="SQLite database path"),
-    adapter: str = typer.Option("antigravity", "--adapter", help="AI agent adapter name"),
-    batch_size: int = typer.Option(5, "--batch-size", help="Batch size for extraction"),
-    force: bool = typer.Option(False, "--force", help="Bypass extraction cache"),
-    executable: str | None = typer.Option(None, "--executable", help="Custom agent executable path"),
+    db: str = typer.Option(
+        "data/work/jobmatcher.db",
+        "--db",
+    ),
+    adapter: str = typer.Option(
+        "antigravity",
+        "--adapter",
+    ),
+    batch_size: int = typer.Option(
+        5,
+        "--batch-size",
+        min=1,
+        max=50,
+    ),
+    workers: int = typer.Option(
+        3,
+        "--workers",
+        min=1,
+        max=8,
+        help=(
+            "Maximum number of concurrent "
+            "agent batch invocations"
+        ),
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+    ),
+    executable: str | None = typer.Option(
+        None,
+        "--executable",
+    ),
 ):
-    typer.echo(json.dumps(extract(db, Path.cwd(), batch_size, force, executable, adapter=adapter), indent=2))
+    summary = extract(
+        db,
+        Path.cwd(),
+        batch_size=batch_size,
+        workers=workers,
+        force=force,
+        executable=executable,
+        adapter_name=adapter,
+    )
+
+    typer.echo(
+        json.dumps(
+            summary,
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+@app.command("extraction-status")
+def extraction_status_cmd(
+    adapter: str = typer.Option("antigravity", "--adapter", help="AI agent adapter name"),
+    run: str | None = typer.Option(None, "--run", help="Specific run ID to inspect"),
+):
+    audit_base = Path.cwd() / "data" / "output" / "extraction-audit" / adapter
+    if not audit_base.exists():
+        typer.echo(f"No extraction audit directory found for adapter '{adapter}'")
+        return
+
+    if run:
+        run_dir = audit_base / run
+        if not run_dir.exists():
+            typer.echo(f"Run directory '{run}' not found under {audit_base}")
+            return
+    else:
+        run_dirs = sorted([d for d in audit_base.iterdir() if d.is_dir() and d.name.startswith("run-")], key=lambda d: d.name)
+        if not run_dirs:
+            typer.echo(f"No run directories found for adapter '{adapter}'")
+            return
+        run_dir = run_dirs[-1]
+
+    batch_dirs = sorted([d for d in run_dir.iterdir() if d.is_dir() and d.name.startswith("batch-")], key=lambda d: d.name)
+
+    statuses = []
+    completed_cnt = 0
+    running_cnt = 0
+    failed_cnt = 0
+
+    for b in batch_dirs:
+        status_file = b / "status.json"
+        val_file = b / "validation.json"
+        b_name = b.name
+        if status_file.exists():
+            try:
+                st_data = json.loads(status_file.read_text(encoding="utf-8"))
+                st = st_data.get("status", "unknown")
+                dur = st_data.get("duration_seconds", 0.0)
+                jobs_cnt = len(st_data.get("job_ids", []))
+                if st == "completed":
+                    completed_cnt += 1
+                    statuses.append(f"{b_name} completed {jobs_cnt} jobs {dur:.1f}s")
+                elif st == "failed":
+                    failed_cnt += 1
+                    statuses.append(f"{b_name} failed {jobs_cnt} jobs {dur:.1f}s")
+                elif st == "running":
+                    running_cnt += 1
+                    statuses.append(f"{b_name} running {jobs_cnt} jobs {dur:.1f}s")
+                else:
+                    statuses.append(f"{b_name} {st}")
+            except Exception:
+                statuses.append(f"{b_name} unreadable status")
+        elif val_file.exists():
+            try:
+                val_data = json.loads(val_file.read_text(encoding="utf-8"))
+                if val_data.get("valid"):
+                    completed_cnt += 1
+                    statuses.append(f"{b_name} completed {val_data.get('duration_seconds', 0.0):.1f}s")
+                else:
+                    failed_cnt += 1
+                    statuses.append(f"{b_name} failed")
+            except Exception:
+                statuses.append(f"{b_name} validation recorded")
+        else:
+            statuses.append(f"{b_name} pending")
+
+    total = len(batch_dirs)
+    typer.echo(f"Run: {run_dir.name}")
+    typer.echo(f"Adapter: {adapter}\n")
+    typer.echo(f"Completed: {completed_cnt}/{total}")
+    typer.echo(f"Running: {running_cnt}")
+    typer.echo(f"Failed: {failed_cnt}")
+    typer.echo(f"Pending: {total - completed_cnt - running_cnt - failed_cnt}\n")
+    for s in statuses:
+        typer.echo(s)
 
 @app.command("parse-resume")
 def parse_resume(
