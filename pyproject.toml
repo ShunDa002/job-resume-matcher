@@ -18,7 +18,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "reportlab>=4,<5"]
-scrape = ["playwright>=1.40,<2"]
 
 [project.scripts]
 jobmatch = "jobmatcher.cli:app"

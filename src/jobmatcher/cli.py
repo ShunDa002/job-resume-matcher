@@ -40,48 +40,46 @@ def ingest_jobs(input:str=typer.Option(...),db:str=typer.Option("data/work/jobma
 @app.command("scrape-jobs")
 def scrape_jobs(
     url: str = typer.Option(DEFAULT_SCRAPE_URL, "--url", help="JobStreet search URL to scrape"),
-    max_pages: int = typer.Option(2, "--max-pages", min=0, help="Pages to scrape; 0 means no limit"),
-    headless: bool = typer.Option(True, "--headless/--no-headless", help="Run Chromium headless"),
-    output: str = typer.Option("data/input/jobstreet_ai_jobs.jsonl", "--output", help="JSONL output path (a .json copy is written alongside it)"),
-    recycle_interval: int = typer.Option(50, "--recycle-interval", min=1, help="Recycle the browser context every N pages"),
-    append: bool = typer.Option(False, "--append", help="Append to an existing JSONL file instead of overwriting it"),
-    ingest: bool = typer.Option(False, "--ingest", help="Also ingest the scraped jobs into the database"),
+    max_pages: int = typer.Option(1, "--max-pages", min=0, help="Pages to scrape; 0 means no limit"),
+    output: str = typer.Option("data/input/jobstreet_ai_jobs.jsonl", "--output", help="JSONL output path for --import (a .json copy is written alongside it)"),
+    brief_file: str = typer.Option(None, "--brief-file", help="Also write the browser task brief to this file"),
+    import_file: str = typer.Option(None, "--import", help="Import records from a JSON file returned by the cloud browser"),
+    ingest: bool = typer.Option(False, "--ingest", help="Also ingest the imported jobs into the database (with --import)"),
     db: str = typer.Option("data/work/jobmatcher.db", "--db"),
 ):
-    """Scrape JobStreet listings to JSON (Playwright + Chromium).
+    """Scrape JobStreet listings via Muse's cloud browser.
 
-    Writes <output> (.jsonl, one job per line) plus the converted .json
-    next to it, in the format `ingest-jobs` accepts, so a scraped file
-    feeds straight into the matching pipeline. With --ingest the
-    scraped jobs are also stored in the database.
-
-    Requires the optional scrape dependency: `pip install -e '.[scrape]'`
-    and `playwright install chromium`.
+    Scraping runs in the cloud browser — the local Playwright path was
+    removed, because this machine's proxy blocks JobStreet. Without
+    --import, this prints the browser task brief: run that brief in the
+    cloud browser, save the JSON array it returns, and bring it back
+    with --import. With --import, the returned records are validated
+    and written as <output> (.jsonl) plus the converted .json, in the
+    format `ingest-jobs` accepts; --ingest also stores them in the
+    database.
     """
-    from .scraper import scrape_jobstreet
+    from .scraper import build_scrape_brief, import_browser_records
 
-    try:
-        count = scrape_jobstreet(
-            target_url=url,
-            max_pages=max_pages or None,
-            headless=headless,
-            output_file=output,
-            recycle_interval=recycle_interval,
-            append=append,
-        )
-    except RuntimeError as e:
-        typer.echo(str(e), err=True)
-        raise typer.Exit(code=1)
-    json_path = str(Path(output).with_suffix(".json"))
-    typer.echo(json.dumps({"scraped": count, "jsonl": output, "json": json_path}, indent=2))
-    if ingest:
-        if not Path(json_path).exists():
-            typer.echo("Nothing scraped; no JSON file to ingest.", err=True)
-            return
-        raw = json.loads(Path(json_path).read_text(encoding="utf-8"))
-        items = raw if isinstance(raw, list) else raw["jobs"]
-        n = _ingest_job_items(items, db)
-        typer.echo(f"Ingested {n} jobs into {db}")
+    if import_file:
+        try:
+            summary = import_browser_records(import_file, output)
+        except (ValueError, OSError) as e:
+            typer.echo(f"Import failed: {e}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(json.dumps(summary, indent=2))
+        if ingest:
+            raw = json.loads(Path(summary["json"]).read_text(encoding="utf-8"))
+            n = _ingest_job_items(raw if isinstance(raw, list) else raw["jobs"], db)
+            typer.echo(f"Ingested {n} jobs into {db}")
+        return
+
+    brief = build_scrape_brief(target_url=url, max_pages=max_pages or None)
+    if brief_file:
+        Path(brief_file).write_text(brief + "\n", encoding="utf-8")
+        typer.echo(f"Wrote browser scrape brief to {brief_file}")
+    typer.echo(brief)
+    typer.echo("\nRun this brief in Muse's cloud browser, save the JSON array it returns, then import it with:")
+    typer.echo(f"  jobmatch scrape-jobs --import <records.json> --output {output} [--ingest --db {db}]")
 
 @app.command("ingest-candidate")
 def ingest_candidate(input:str=typer.Option(...),db:str=typer.Option("data/work/jobmatcher.db")):

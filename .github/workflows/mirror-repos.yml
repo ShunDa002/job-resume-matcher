@@ -1,0 +1,92 @@
+name: Mirror repositories
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  delete:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-mirrors
+  cancel-in-progress: false
+
+jobs:
+  mirror-to-gitlab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Clone complete GitHub repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git clone --mirror \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            repository.git
+
+      - name: Push branches and tags to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_REPOSITORY: ${{ vars.GITLAB_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          cd repository.git
+
+          git remote add gitlab \
+            "https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_REPOSITORY}.git"
+
+          git push gitlab \
+            --force \
+            --prune \
+            "refs/heads/*:refs/heads/*" \
+            "refs/tags/*:refs/tags/*"
+
+  mirror-to-azure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Clone complete GitHub repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git clone --mirror \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            repository.git
+
+      - name: Push branches and tags to Azure Repos
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          AZURE_DEVOPS_ORGANIZATION: ${{ vars.AZURE_DEVOPS_ORGANIZATION }}
+          AZURE_DEVOPS_PROJECT: ${{ vars.AZURE_DEVOPS_PROJECT }}
+          AZURE_DEVOPS_REPOSITORY: ${{ vars.AZURE_DEVOPS_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          cd repository.git
+
+          AUTH_HEADER="$(
+            printf ':%s' "$AZURE_DEVOPS_PAT" |
+            base64 -w 0
+          )"
+
+          AZURE_REPO_URL="https://dev.azure.com/${AZURE_DEVOPS_ORGANIZATION}/${AZURE_DEVOPS_PROJECT}/_git/${AZURE_DEVOPS_REPOSITORY}"
+
+          git \
+            -c "http.extraheader=Authorization: Basic ${AUTH_HEADER}" \
+            push "$AZURE_REPO_URL" \
+            --force \
+            --prune \
+            "refs/heads/*:refs/heads/*" \
+            "refs/tags/*:refs/tags/*"

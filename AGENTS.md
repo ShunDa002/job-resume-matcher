@@ -24,7 +24,11 @@ This repository implements Phase 1 of a universal job-to-resume matcher.
 - An 'or' list in a job description is ONE requirement with alternatives, never several requirements; `apply-jobs` records same-evidence requirements as warnings in `validation.json`, not errors.
 - `scripts/demo.sh` uses candidate-demo, never candidate-001, so running the demo cannot overwrite a real candidate-001 resume bundle.
 - Scraping (`src/jobmatcher/scraper.py`, `jobmatch scrape-jobs`) is an
-  optional input step: it fetches public JobStreet listings into the
-  JSON format `ingest-jobs` accepts. Playwright is an optional extra
-  (`.[scrape]`); importing the scraper must not require it. Scraping
-  never touches matching, scoring, eligibility, or extraction.
+  optional input step that runs in Muse's cloud browser: the tool builds
+  the scrape brief (`build_scrape_brief`), the browser runs it, and the
+  tool validates and imports the returned records
+  (`validate_records` / `import_browser_records`) into the JSON format
+  `ingest-jobs` accepts. There is no local browser automation — no
+  Playwright, no Chromium — because this machine's proxy blocks
+  JobStreet. Scraping never touches matching, scoring, eligibility, or
+  extraction.
