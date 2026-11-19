@@ -169,6 +169,23 @@
           "title": "Degree Fields",
           "type": "array"
         },
+        "requires_current_enrollment": {
+          "default": false,
+          "title": "Requires Current Enrollment",
+          "type": "boolean"
+        },
+        "enrollment_evidence_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enrollment Evidence Text"
+        },
         "requirements": {
           "items": {
             "$ref": "#/$defs/XReq"
@@ -267,8 +284,8 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "extraction-result.v1",
-      "default": "extraction-result.v1",
+      "const": "extraction-result.v2",
+      "default": "extraction-result.v2",
       "title": "Schema Version",
       "type": "string"
     },

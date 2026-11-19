@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 from jobmatcher_resume.service import prepare_resume_extraction, validate_resume_extraction, ingest_resume_extraction
 
-RAW = {'schema_version':'candidate-profile.v1','candidate_id':'candidate-001','citizenship_country_code':None,'residence_country_code':None,'has_target_country_work_rights':False,'target_employment_types':['full_time'],'career_level':'fresh_graduate','professional_experience_years':0,'degree_fields':['software_engineering'],'graduation_date':None,'skills':[{'skill_id':'python','category':'technical_skills','level':'substantial_project','evidence':['Python']}],'responsibilities':[],'domains':[],'soft_skills':[],'metadata':{}}
+RAW = {'schema_version':'candidate-profile.v2','candidate_id':'candidate-001','citizenship_country_code':None,'residence_country_code':None,'has_target_country_work_rights':False,'target_employment_types':['full_time'],'career_level':'fresh_graduate','professional_experience_years':0,'degree_fields':['software_engineering'],'graduation_date':None,'skills':[{'skill_id':'python','category':'technical_skills','level':'substantial_project','evidence':['Python']}],'responsibilities':[],'domains':[],'soft_skills':[],'metadata':{}}
 
 def _paths(root):
     return {
         'schema_path': root/'schemas/candidate-profile.schema.json',
-        'prompt_path': root/'prompts/extract-resume.v1.md',
+        'prompt_path': root/'prompts/extract-resume.v2.md',
         'repair_prompt_path': root/'prompts/repair-resume.v1.md',
     }
 
@@ -16,6 +16,14 @@ def test_service(tmp_path):
     root=Path.cwd()
     cand,doc=ingest_resume_extraction(resume_path=resume,candidate_id='candidate-001',extraction=RAW,audit_dir=tmp_path/'audit',overrides={'citizenship_country_code':'MY'},**_paths(root))
     assert cand.citizenship_country_code=='MY' and cand.metadata['resume_source_format']=='txt'; assert (tmp_path/'audit/candidate-profile.json').exists()
+
+def test_currently_enrolled_defaults_false_and_override_sets_it(tmp_path):
+    resume=tmp_path/'resume.txt'; resume.write_text('Python student in software engineering')
+    root=Path.cwd()
+    cand,doc=ingest_resume_extraction(resume_path=resume,candidate_id='candidate-001',extraction=RAW,audit_dir=tmp_path/'audit',overrides={'currently_enrolled':True},**_paths(root))
+    assert cand.currently_enrolled is True
+    cand2,doc2=ingest_resume_extraction(resume_path=resume,candidate_id='candidate-001',extraction=RAW,audit_dir=tmp_path/'audit2',overrides={},**_paths(root))
+    assert cand2.currently_enrolled is False
 
 def test_prepare_then_validate_with_repair(tmp_path):
     resume=tmp_path/'resume.txt'; resume.write_text('Python student in software engineering')

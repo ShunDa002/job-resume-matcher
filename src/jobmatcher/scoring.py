@@ -18,7 +18,55 @@ def _candidate_evidence(candidate):
         out.extend(getattr(candidate,attr))
     return out
 
-def _match_requirement(req,candidate,policy,taxonomy):
+# Degree requirements: a requirement such as "degree",
+# "bachelors_degree", or "computer_science" (education category) is
+# about the candidate's degree, not a skill, so it is matched against
+# candidate.degree_fields instead of the skill taxonomy. The profile
+# stores degree fields but no degree level, so a requirement that only
+# a higher degree satisfies (masters / PhD) is reported absent rather
+# than guessed. A "currently pursuing" marker is treated as satisfied
+# by holding the degree in that field.
+_DEGREE_MARKERS={"degree","diploma","bachelor","bachelors","undergraduate","bsc","bs","beng","ba","master","masters","msc","ms","meng","mba","phd","doctorate","doctoral","postgraduate","advanced","matriculated","studying","pursuing"}
+_BACHELOR_TOKENS={"bachelor","bachelors","undergraduate","bsc","bs","beng","ba"}
+_HIGHER_TOKENS={"master","masters","msc","ms","meng","mba","phd","doctorate","doctoral","postgraduate","advanced"}
+_DEGREE_FIELDS={"computer_science","software_engineering","information_systems","artificial_intelligence","data_science","computer_engineering","information_technology","electrical_engineering","electronics_engineering","mechanical_engineering","chemical_engineering","civil_engineering","mathematics","applied_mathematics","engineering","network_engineering","information_security","architecture"}
+_COMPUTING_FIELDS={"computer_science","software_engineering","information_systems","artificial_intelligence","data_science"}
+
+def _match_degree_requirement(req,candidate,job_degree_fields):
+    key=normalize_key(req.canonical_value); tokens=set(key.split("_"))
+    # A bare field name ("software_engineering", "computer_science") is
+    # only a degree requirement in the education category. Outside it
+    # the same words mean the practice ("build ... using software
+    # engineering"), which a degree alone does not evidence at 1.0.
+    # A generic degree value ("degree", "bachelors_degree") is a degree
+    # requirement in any category.
+    if req.category=="education":
+        if not (tokens&_DEGREE_MARKERS or key in _DEGREE_FIELDS): return None
+    elif not tokens&_DEGREE_MARKERS:
+        return None
+    def absent(): return EvidenceMatch(requirement_id=req.requirement_id,requirement=req.canonical_value,candidate_skill=None,evidence_score=0.0,relation="absent",candidate_evidence=[])
+    if tokens&_HIGHER_TOKENS and not tokens&_BACHELOR_TOKENS: return absent()
+    fields={f for f in [key]+list(req.alternatives) if f in _DEGREE_FIELDS}
+    fields|={f for f in _DEGREE_FIELDS if f in key}
+    fields|={normalize_key(f) for f in (job_degree_fields or []) if normalize_key(f) in _DEGREE_FIELDS}
+    c={normalize_key(x) for x in candidate.degree_fields}
+    if not c: return absent()
+    hit=c&fields
+    if hit:
+        field=sorted(hit)[0]
+        return EvidenceMatch(requirement_id=req.requirement_id,requirement=req.canonical_value,candidate_skill=field,evidence_score=1.0,relation="exact_or_alias",candidate_evidence=[f"Degree in {field}"])
+    if not fields:
+        field=sorted(c)[0]
+        return EvidenceMatch(requirement_id=req.requirement_id,requirement=req.canonical_value,candidate_skill=field,evidence_score=1.0,relation="exact_or_alias",candidate_evidence=[f"Degree in {field}"])
+    if c&_COMPUTING_FIELDS and fields&_COMPUTING_FIELDS:
+        field=sorted(c&_COMPUTING_FIELDS)[0]
+        return EvidenceMatch(requirement_id=req.requirement_id,requirement=req.canonical_value,candidate_skill=field,evidence_score=0.9,relation="transferable",candidate_evidence=[f"Degree in {field}"])
+    field=sorted(c)[0]
+    return EvidenceMatch(requirement_id=req.requirement_id,requirement=req.canonical_value,candidate_skill=field,evidence_score=0.5,relation="transferable",candidate_evidence=[f"Degree in {field}"])
+
+def _match_requirement(req,candidate,policy,taxonomy,job_degree_fields=None):
+    degree_match=_match_degree_requirement(req,candidate,job_degree_fields)
+    if degree_match is not None: return degree_match
     aliases,related=_taxonomy_maps(taxonomy); evidence=_candidate_evidence(candidate)
     targets=[req.canonical_value]+req.alternatives
     target_ids=[aliases.get(normalize_key(x),normalize_key(x)) for x in targets]
@@ -61,7 +109,7 @@ def score_job(candidate,job,eligibility,reasons,risk,score_policy,taxonomy,versi
     hard={EligibilityStatus.INELIGIBLE_CITIZENSHIP,EligibilityStatus.INELIGIBLE_EXPERIENCE,EligibilityStatus.INELIGIBLE_SENIORITY,EligibilityStatus.INELIGIBLE_WORK_AUTHORIZATION,EligibilityStatus.INSUFFICIENT_INFORMATION}
     if eligibility in hard:
         return MatchResult(candidate_id=candidate.candidate_id,job_id=job.job_id,eligibility_status=eligibility,eligibility_reasons=reasons,work_authorization_risk=risk,scores=None,policy_versions=versions,requirement_count=n_req,thin_evidence=thin)
-    matches=[_match_requirement(r,candidate,score_policy,taxonomy) for r in job.requirements]
+    matches=[_match_requirement(r,candidate,score_policy,taxonomy,job.degree_fields) for r in job.requirements]
     vals={c:_category_score(job.requirements,matches,score_policy,c) for c in CATS}
     vals["education"]=_education_score(candidate,job); vals["career_level"]=_career_score(candidate,job)
     weighted=sum(vals[k]*float(score_policy["category_weights"][k]) for k in score_policy["category_weights"])

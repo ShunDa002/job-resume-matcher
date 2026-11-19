@@ -29,7 +29,7 @@
   "professional_experience_years": 0,
   "residence_country_code": null,
   "responsibilities": [],
-  "schema_version": "candidate-profile.v1",
+  "schema_version": "candidate-profile.v2",
   "skills": [
     {
       "category": "technical_skills",
@@ -99,5 +99,6 @@
   "soft_skills": [],
   "target_employment_types": [
     "full_time"
-  ]
+  ],
+  "currently_enrolled": false
 }

@@ -6,9 +6,9 @@ from .scoring import score_job
 from .util import sha256_data
 
 def run_match(db_path,candidate_id,eligibility_path=None,scoring_path=None,taxonomy_path=None):
-    eligibility_path=eligibility_path or default_config("eligibility-policy.v1.yaml")
-    scoring_path=scoring_path or default_config("scoring-policy.v2.yaml")
-    taxonomy_path=taxonomy_path or default_config("skill-taxonomy.v1.yaml")
+    eligibility_path=eligibility_path or default_config("eligibility-policy.v2.yaml")
+    scoring_path=scoring_path or default_config("scoring-policy.v3.yaml")
+    taxonomy_path=taxonomy_path or default_config("skill-taxonomy.v2.yaml")
     ep,sp,tax=load_yaml(eligibility_path),load_yaml(scoring_path),load_yaml(taxonomy_path)
     versions={"eligibility":ep["version"],"scoring":sp["version"],"taxonomy":tax["version"]}
     run_key=sha256_data({"candidate_id":candidate_id,"versions":versions})

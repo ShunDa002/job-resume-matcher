@@ -15,7 +15,7 @@ class SkillEvidence(BaseModel):
 
 class CandidateExtractionResult(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    schema_version:Literal['candidate-profile.v1']='candidate-profile.v1'
+    schema_version:Literal['candidate-profile.v2']='candidate-profile.v2'
     candidate_id:str
     citizenship_country_code:str|None=None
     residence_country_code:str|None=None
@@ -23,6 +23,10 @@ class CandidateExtractionResult(BaseModel):
     target_employment_types:list[str]=Field(default_factory=lambda:['full_time'])
     career_level:Literal['student','fresh_graduate','junior','mid','senior','manager','unknown']='unknown'
     professional_experience_years:float=Field(default=0,ge=0)
+    # True only when the resume explicitly states current enrollment or
+    # a future expected graduation; false when graduated. May also be
+    # set by operator override.
+    currently_enrolled:bool=False
     degree_fields:list[str]=Field(default_factory=list)
     graduation_date:date|None=None
     skills:list[SkillEvidence]=Field(default_factory=list)

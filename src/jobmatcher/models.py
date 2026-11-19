@@ -27,6 +27,7 @@ class EligibilityStatus(StrEnum):
     INELIGIBLE_EXPERIENCE="INELIGIBLE_EXPERIENCE"
     INELIGIBLE_SENIORITY="INELIGIBLE_SENIORITY"
     INELIGIBLE_CITIZENSHIP="INELIGIBLE_CITIZENSHIP"
+    INELIGIBLE_ENROLLMENT="INELIGIBLE_ENROLLMENT"
 
 class SkillEvidence(BaseModel):
     skill_id: str
@@ -36,7 +37,7 @@ class SkillEvidence(BaseModel):
 
 class CandidateProfile(BaseModel):
     model_config=ConfigDict(extra="forbid")
-    schema_version: Literal["candidate-profile.v1"]="candidate-profile.v1"
+    schema_version: Literal["candidate-profile.v2"]="candidate-profile.v2"
     candidate_id: str
     citizenship_country_code: str|None=None
     residence_country_code: str|None=None
@@ -44,6 +45,10 @@ class CandidateProfile(BaseModel):
     target_employment_types: list[str]=Field(default_factory=lambda:["full_time"])
     career_level: str="fresh_graduate"
     professional_experience_years: float=0
+    # Whether the candidate is currently enrolled in study. False for a
+    # graduate. Set from the resume or by operator override; never
+    # inferred from the job side.
+    currently_enrolled: bool=False
     degree_fields: list[str]=Field(default_factory=list)
     graduation_date: date|None=None
     skills: list[SkillEvidence]=Field(default_factory=list)
@@ -90,6 +95,10 @@ class JobRecord(BaseModel):
     required_citizenship_country_code: str|None=None
     sponsorship: Literal["available","not_available","unknown"]="unknown"
     degree_fields: list[str]=Field(default_factory=list)
+    # True only when the description requires the applicant to be
+    # currently enrolled in / pursuing study, with no alternative for
+    # graduates or recent completers. Set by extraction (v2).
+    requires_current_enrollment: bool=False
     requirements: list[Requirement]=Field(default_factory=list)
     data_quality_flags: list[str]=Field(default_factory=list)
     content_hash: str|None=None

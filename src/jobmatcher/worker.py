@@ -80,6 +80,7 @@ def apply_extracted_facts(job: JobRecord, fact: XJob) -> None:
     )
     job.sponsorship = fact.work_authorization.sponsorship
     job.degree_fields = fact.degree_fields
+    job.requires_current_enrollment = fact.requires_current_enrollment
     job.requirements = [
         Requirement.model_validate(r.model_dump())
         for r in fact.requirements
@@ -126,6 +127,10 @@ def verify(x: ExtractionResult, inputs: list[dict[str, Any]]) -> list[str]:
         d = exp.get(j.job_id, {}).get("description", "")
         if j.citizenship.evidence_text and j.citizenship.evidence_text not in d:
             errs.append(f"{j.job_id}:bad_citizenship_evidence")
+        if j.enrollment_evidence_text and j.enrollment_evidence_text not in d:
+            errs.append(f"{j.job_id}:bad_enrollment_evidence")
+        if j.requires_current_enrollment and not j.enrollment_evidence_text:
+            errs.append(f"{j.job_id}:missing_enrollment_evidence")
         for r in j.requirements:
             if r.original_text not in d:
                 errs.append(f"{j.job_id}:{r.requirement_id}:bad_evidence")

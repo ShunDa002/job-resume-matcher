@@ -15,7 +15,7 @@ def _job(source_job_id, title, description):
 
 
 def _extraction(jobs):
-    out = {"schema_version": "extraction-result.v1", "jobs": []}
+    out = {"schema_version": "extraction-result.v2", "jobs": []}
     for j in jobs:
         desc = j.description
         ce = "Applicants must be Singaporean citizens." if "Singaporean citizens" in desc else None
@@ -119,7 +119,7 @@ def test_duplicate_evidence_warnings():
     from jobmatcher.worker import duplicate_evidence_warnings
 
     raw = {
-        "schema_version": "extraction-result.v1",
+        "schema_version": "extraction-result.v2",
         "jobs": [{
             "job_id": "x-1",
             "normalized_title": "Engineer",

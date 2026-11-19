@@ -1,0 +1,79 @@
+version: skill-taxonomy.v2
+skills:
+  python:
+    aliases: [python3]
+  typescript:
+    aliases: [ts]
+  react:
+    aliases: [reactjs, react.js]
+    related:
+      nextjs: 0.80
+  nextjs:
+    aliases: [next.js]
+  fastapi:
+    aliases: []
+  docker:
+    aliases: [containers, containerization]
+    related:
+      kubernetes: 0.35
+  kubernetes:
+    aliases: [k8s]
+  pytorch:
+    aliases: [torch]
+  tensorflow:
+    aliases: [tf]
+  rag:
+    aliases: [retrieval augmented generation, retrieval-augmented generation]
+  langchain:
+    aliases: []
+    related:
+      rag: 0.80
+  vector_database:
+    aliases: [vector db, vector store, chroma]
+  supabase_vector:
+    aliases: [supabase vector db]
+    related:
+      vector_database: 0.90
+  computer_vision:
+    aliases: [cv, image classification]
+  llm:
+    aliases: [large language model, large language models]
+  mcp:
+    aliases: [model context protocol]
+  git:
+    aliases: []
+  linux:
+    aliases: []
+  # Databases (added v2): a generic "databases" or "sql" requirement is
+  # satisfied by hands-on work with any concrete database. Concrete
+  # databases transfer within the relational family; document and
+  # key-value stores do not transfer to a relational requirement.
+  databases:
+    aliases: [database, sql, dbms, relational database, relational databases]
+    related:
+      sqlite: 0.90
+      mysql: 0.90
+      postgresql: 0.90
+      mongodb: 0.85
+      redis: 0.80
+      vector_database: 0.80
+  sqlite:
+    aliases: [sqlite3]
+    related:
+      mysql: 0.70
+      postgresql: 0.70
+  mysql:
+    aliases: []
+    related:
+      postgresql: 0.80
+  postgresql:
+    aliases: [postgres, psql]
+  mongodb:
+    aliases: [mongo]
+  redis:
+    aliases: []
+  # APIs (added v2): building APIs with a web framework is API work.
+  api:
+    aliases: [apis, rest api, restful api, restful apis]
+    related:
+      fastapi: 0.80

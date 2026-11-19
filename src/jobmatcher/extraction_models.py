@@ -8,6 +8,6 @@ class Citizenship(BaseModel):
 class WorkAuth(BaseModel):
  model_config=ConfigDict(extra='forbid'); sponsorship:Literal['available','not_available','unknown']; evidence_text:str|None=None
 class XJob(BaseModel):
- model_config=ConfigDict(extra='forbid'); job_id:str; normalized_title:str|None=None; normalized_company:str|None=None; minimum_experience_years:float|None=None; experience_requirement_type:Literal['required','preferred','not_stated']; career_level:Literal['entry_level','unspecified','senior','lead','manager','senior_manager','director','head','executive']; citizenship:Citizenship; work_authorization:WorkAuth; degree_fields:list[str]=Field(default_factory=list); requirements:list[XReq]=Field(default_factory=list); warnings:list[str]=Field(default_factory=list)
+ model_config=ConfigDict(extra='forbid'); job_id:str; normalized_title:str|None=None; normalized_company:str|None=None; minimum_experience_years:float|None=None; experience_requirement_type:Literal['required','preferred','not_stated']; career_level:Literal['entry_level','unspecified','senior','lead','manager','senior_manager','director','head','executive']; citizenship:Citizenship; work_authorization:WorkAuth; degree_fields:list[str]=Field(default_factory=list); requires_current_enrollment:bool=False; enrollment_evidence_text:str|None=None; requirements:list[XReq]=Field(default_factory=list); warnings:list[str]=Field(default_factory=list)
 class ExtractionResult(BaseModel):
- model_config=ConfigDict(extra='forbid'); schema_version:Literal['extraction-result.v1']='extraction-result.v1'; jobs:list[XJob]
+ model_config=ConfigDict(extra='forbid'); schema_version:Literal['extraction-result.v2']='extraction-result.v2'; jobs:list[XJob]

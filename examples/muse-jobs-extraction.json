@@ -1,1 +1,120 @@
-{"jobs":[{"career_level":"unspecified","citizenship":{"country_code":null,"evidence_text":null,"requirement":"not_stated"},"degree_fields":[],"experience_requirement_type":"not_stated","job_id":"jobstreet_sg-95408528","minimum_experience_years":null,"normalized_company":"Ensign","normalized_title":"AI LLM Developer","requirements":[{"alternatives":[],"canonical_value":"python","category":"technical_skills","critical":true,"importance":"core","minimum_years":null,"necessity":"required","original_text":"Good grasp of Python","requirement_id":"j1-r1"},{"alternatives":["react"],"canonical_value":"typescript","category":"technical_skills","critical":false,"importance":"supporting","minimum_years":null,"necessity":"required","original_text":"React or TypeScript","requirement_id":"j1-r2"},{"alternatives":["kubernetes"],"canonical_value":"docker","category":"tools_deployment","critical":false,"importance":"supporting","minimum_years":null,"necessity":"required","original_text":"Docker or Kubernetes","requirement_id":"j1-r3"},{"alternatives":[],"canonical_value":"rag","category":"domain","critical":true,"importance":"core","minimum_years":null,"necessity":"required","original_text":"RAG exposure","requirement_id":"j1-r4"}],"warnings":[],"work_authorization":{"evidence_text":null,"sponsorship":"unknown"}},{"career_level":"unspecified","citizenship":{"country_code":"SG","evidence_text":"Applicants must be Singaporean citizens.","requirement":"explicit"},"degree_fields":[],"experience_requirement_type":"not_stated","job_id":"jobstreet_sg-95393535","minimum_experience_years":null,"normalized_company":"ST Engineering Defence Aviation Services","normalized_title":"Engineer AI and Digitalisation","requirements":[],"warnings":[],"work_authorization":{"evidence_text":null,"sponsorship":"unknown"}},{"career_level":"senior","citizenship":{"country_code":null,"evidence_text":null,"requirement":"not_stated"},"degree_fields":[],"experience_requirement_type":"required","job_id":"jobstreet_sg-95411639","minimum_experience_years":4.0,"normalized_company":"Digital Place Vision","normalized_title":"Senior AI Engineer","requirements":[],"warnings":[],"work_authorization":{"evidence_text":null,"sponsorship":"unknown"}}],"schema_version":"extraction-result.v1"}
+{
+  "jobs": [
+    {
+      "career_level": "unspecified",
+      "citizenship": {
+        "country_code": null,
+        "evidence_text": null,
+        "requirement": "not_stated"
+      },
+      "degree_fields": [],
+      "experience_requirement_type": "not_stated",
+      "job_id": "jobstreet_sg-95408528",
+      "minimum_experience_years": null,
+      "normalized_company": "Ensign",
+      "normalized_title": "AI LLM Developer",
+      "requirements": [
+        {
+          "alternatives": [],
+          "canonical_value": "python",
+          "category": "technical_skills",
+          "critical": true,
+          "importance": "core",
+          "minimum_years": null,
+          "necessity": "required",
+          "original_text": "Good grasp of Python",
+          "requirement_id": "j1-r1"
+        },
+        {
+          "alternatives": [
+            "react"
+          ],
+          "canonical_value": "typescript",
+          "category": "technical_skills",
+          "critical": false,
+          "importance": "supporting",
+          "minimum_years": null,
+          "necessity": "required",
+          "original_text": "React or TypeScript",
+          "requirement_id": "j1-r2"
+        },
+        {
+          "alternatives": [
+            "kubernetes"
+          ],
+          "canonical_value": "docker",
+          "category": "tools_deployment",
+          "critical": false,
+          "importance": "supporting",
+          "minimum_years": null,
+          "necessity": "required",
+          "original_text": "Docker or Kubernetes",
+          "requirement_id": "j1-r3"
+        },
+        {
+          "alternatives": [],
+          "canonical_value": "rag",
+          "category": "domain",
+          "critical": true,
+          "importance": "core",
+          "minimum_years": null,
+          "necessity": "required",
+          "original_text": "RAG exposure",
+          "requirement_id": "j1-r4"
+        }
+      ],
+      "warnings": [],
+      "work_authorization": {
+        "evidence_text": null,
+        "sponsorship": "unknown"
+      },
+      "requires_current_enrollment": false,
+      "enrollment_evidence_text": null
+    },
+    {
+      "career_level": "unspecified",
+      "citizenship": {
+        "country_code": "SG",
+        "evidence_text": "Applicants must be Singaporean citizens.",
+        "requirement": "explicit"
+      },
+      "degree_fields": [],
+      "experience_requirement_type": "not_stated",
+      "job_id": "jobstreet_sg-95393535",
+      "minimum_experience_years": null,
+      "normalized_company": "ST Engineering Defence Aviation Services",
+      "normalized_title": "Engineer AI and Digitalisation",
+      "requirements": [],
+      "warnings": [],
+      "work_authorization": {
+        "evidence_text": null,
+        "sponsorship": "unknown"
+      },
+      "requires_current_enrollment": false,
+      "enrollment_evidence_text": null
+    },
+    {
+      "career_level": "senior",
+      "citizenship": {
+        "country_code": null,
+        "evidence_text": null,
+        "requirement": "not_stated"
+      },
+      "degree_fields": [],
+      "experience_requirement_type": "required",
+      "job_id": "jobstreet_sg-95411639",
+      "minimum_experience_years": 4.0,
+      "normalized_company": "Digital Place Vision",
+      "normalized_title": "Senior AI Engineer",
+      "requirements": [],
+      "warnings": [],
+      "work_authorization": {
+        "evidence_text": null,
+        "sponsorship": "unknown"
+      },
+      "requires_current_enrollment": false,
+      "enrollment_evidence_text": null
+    }
+  ],
+  "schema_version": "extraction-result.v2"
+}

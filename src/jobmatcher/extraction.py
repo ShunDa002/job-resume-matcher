@@ -8,7 +8,7 @@ working in the loop:
 
 1. ``jobmatch prepare-jobs`` writes one bundle per batch under
    ``data/output/muse-extraction/<run_id>/batch-000000/`` containing
-   ``prompt.txt`` (rendered from ``prompts/extract-requirements.v2.md``),
+   ``prompt.txt`` (rendered from ``prompts/extract-requirements.v3.md``),
    ``input.json``, ``schema.json``, and an empty ``extraction.json``
    placeholder. Nothing is extracted yet; the batch status is
    ``awaiting_muse``.
@@ -62,7 +62,7 @@ def _paths(workspace: Path) -> dict[str, Path]:
         base = Path(__file__).resolve().parents[2]
     return {
         "schema": base / "schemas" / "extraction-result.schema.json",
-        "prompt": base / "prompts" / "extract-requirements.v2.md",
+        "prompt": base / "prompts" / "extract-requirements.v3.md",
         "repair": base / "prompts" / "repair-extraction.v1.md",
     }
 

@@ -52,8 +52,8 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "candidate-profile.v1",
-      "default": "candidate-profile.v1",
+      "const": "candidate-profile.v2",
+      "default": "candidate-profile.v2",
       "title": "Schema Version",
       "type": "string"
     },
@@ -116,6 +116,11 @@
       "minimum": 0,
       "title": "Professional Experience Years",
       "type": "number"
+    },
+    "currently_enrolled": {
+      "default": false,
+      "title": "Currently Enrolled",
+      "type": "boolean"
     },
     "degree_fields": {
       "items": {

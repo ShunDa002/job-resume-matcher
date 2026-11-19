@@ -1,0 +1,45 @@
+version: scoring-policy.v3
+category_weights:
+  technical_skills: 0.35
+  responsibility_alignment: 0.20
+  education: 0.10
+  career_level: 0.15
+  domain: 0.10
+  tools_deployment: 0.05
+  soft_skills: 0.05
+requirement_weights:
+  required_core: 5
+  required_supporting: 3
+  preferred: 1
+evidence_scores:
+  deployed_professional: 1.00
+  deployed_project: 0.90
+  substantial_project: 0.80
+  coursework: 0.45
+  stated_only: 0.35
+  transferable_strong: 0.70
+  transferable_weak: 0.35
+  absent: 0.00
+critical_gap_penalties:
+  one: 8
+  two: 18
+  three_or_more_score_cap: 45
+# Assessment confidence: how much evidence the score rests on. A score
+# averaged over 3 requirements is far less trustworthy than one averaged
+# over 10, so confidence scales with the requirement count up to
+# full_evidence_requirements, then the usual deductions apply.
+confidence:
+  base: 90.0
+  full_evidence_requirements: 8
+  data_quality_flag_penalty: 5
+  data_quality_flag_cap: 20
+  unknown_sponsorship_penalty: 5
+eligibility_rank:
+  ELIGIBLE: 1
+  CONDITIONALLY_ELIGIBLE: 2
+  INSUFFICIENT_INFORMATION: 3
+  INELIGIBLE_WORK_AUTHORIZATION: 4
+  INELIGIBLE_EXPERIENCE: 5
+  INELIGIBLE_SENIORITY: 6
+  INELIGIBLE_CITIZENSHIP: 7
+  INELIGIBLE_ENROLLMENT: 8
